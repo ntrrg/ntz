@@ -293,9 +293,10 @@ pub fn build(b: *std.Build) void {
     const fmt_step = b.step("fmt", "Format source code");
 
     const zig_fmt = b.addFmt(.{ .paths = &.{
-        "build.zig",
         "build.zig.zon",
+        "build.zig",
         "src",
+        "examples",
     } });
 
     fmt_step.dependOn(&zig_fmt.step);
