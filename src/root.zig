@@ -7,8 +7,8 @@
 
 pub const encoding = @import("encoding/root.zig");
 pub const io = @import("io/root.zig");
+pub const os = @import("os/root.zig");
 pub const logging = @import("logging/root.zig");
-pub const testing = @import("testing/root.zig");
 pub const types = @import("types/root.zig");
 
 pub const Status = @import("Status.zig");

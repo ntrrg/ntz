@@ -1,9 +1,10 @@
 // Copyright 2023 Miguel Angel Rivera Notararigo. All rights reserved.
 // This source code was released under the MIT license.
 
-const ntz = @import("ntz");
-const testing = ntz.testing;
+const std = @import("std");
+const testing = std.testing;
 
+const ntz = @import("ntz");
 const logging = ntz.logging;
 
 test "ntz.logging" {
@@ -11,22 +12,41 @@ test "ntz.logging" {
 }
 
 test "ntz.logging.Level.key" {
-    try testing.expectEqlStrs(logging.Level.debug.key(), "DEBUG");
-    try testing.expectEqlStrs(logging.Level.info.key(), "INFO");
-    try testing.expectEqlStrs(logging.Level.warn.key(), "WARN");
-    try testing.expectEqlStrs(logging.Level.@"error".key(), "ERROR");
-    try testing.expectEqlStrs(logging.Level.fatal.key(), "FATAL");
+    try testing.expectEqualStrings("DEBUG", logging.Level.debug.key());
+    try testing.expectEqualStrings("INFO", logging.Level.info.key());
+    try testing.expectEqualStrings("WARN", logging.Level.warn.key());
+    try testing.expectEqualStrings("ERROR", logging.Level.@"error".key());
+    try testing.expectEqualStrings("FATAL", logging.Level.fatal.key());
 }
 
 test "ntz.logging.Level.fromKey" {
-    try testing.expectEql(try logging.Level.fromKey("DEBUG"), .debug);
-    try testing.expectEql(try logging.Level.fromKey("INFO"), .info);
-    try testing.expectEql(try logging.Level.fromKey("WARN"), .warn);
-    try testing.expectEql(try logging.Level.fromKey("ERROR"), .@"error");
-    try testing.expectEql(try logging.Level.fromKey("FATAL"), .fatal);
+    try testing.expectEqual(
+        logging.Level.debug,
+        try logging.Level.fromKey("DEBUG"),
+    );
 
-    try testing.expectErr(
-        logging.Level.fromKey("DDEBUG"),
+    try testing.expectEqual(
+        logging.Level.info,
+        try logging.Level.fromKey("INFO"),
+    );
+
+    try testing.expectEqual(
+        logging.Level.warn,
+        try logging.Level.fromKey("WARN"),
+    );
+
+    try testing.expectEqual(
+        logging.Level.@"error",
+        try logging.Level.fromKey("ERROR"),
+    );
+
+    try testing.expectEqual(
+        logging.Level.fatal,
+        try logging.Level.fromKey("FATAL"),
+    );
+
+    try testing.expectError(
         logging.Level.FromKeyError.InvalidSeverity,
+        logging.Level.fromKey("DDEBUG"),
     );
 }

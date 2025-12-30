@@ -23,9 +23,9 @@ pub fn Logger(
     return struct {
         const Self = @This();
 
-        mutex: ?*std.Thread.Mutex = null,
-        writer: Writer,
-        encoder: Encoder,
+        mux: ?*std.Thread.Mutex = null,
+        w: Writer,
+        enc: Encoder,
 
         level: Level = switch (builtin.mode) {
             .Debug => .debug,
@@ -66,16 +66,16 @@ pub fn Logger(
             else
                 ctx;
 
-            if (l.mutex) |mux| mux.lock();
-            defer if (l.mutex) |mux| mux.unlock();
-            l.encoder.encode(l.writer, val) catch return;
-            _ = l.writer.write("\n") catch return;
+            if (l.mux) |mux| mux.lock();
+            defer if (l.mux) |mux| mux.unlock();
+            l.enc.encode(l.w, val) catch return;
+            _ = l.w.write("\n") catch return;
         }
 
         /// Like `.log` but supports string formatting.
         pub fn logf(
             l: Self,
-            allocator: anytype,
+            allocator: std.mem.Allocator,
             level: Level,
             comptime fmt: []const u8,
             args: anytype,
@@ -97,11 +97,11 @@ pub fn Logger(
         pub fn with(
             l: Self,
             comptime key: []const u8,
-            val: types.Field(Context, scope ++ key),
+            value: types.Field(Context, scope ++ key),
         ) Self {
             if (l.level == .disabled) return l;
             var _l = l;
-            types.setField(&_l.ctx, scope ++ key, val);
+            types.setField(&_l.ctx, scope ++ key, value);
             return _l;
         }
 
@@ -113,9 +113,9 @@ pub fn Logger(
             (if (scope.len > 0) scope ++ new_scope else new_scope) ++ ".",
         ) {
             return .{
-                .mutex = l.mutex,
-                .writer = l.writer,
-                .encoder = l.encoder,
+                .mux = l.mux,
+                .w = l.w,
+                .enc = l.enc,
                 .level = l.level,
                 .ctx = l.ctx,
             };
@@ -140,7 +140,7 @@ pub fn Logger(
         /// Like `.debug` but supports string formatting.
         pub fn debugf(
             l: Self,
-            allocator: anytype,
+            allocator: std.mem.Allocator,
             comptime fmt: []const u8,
             args: anytype,
         ) void {
@@ -157,7 +157,7 @@ pub fn Logger(
         /// Like `.err` but supports string formatting.
         pub fn errf(
             l: Self,
-            allocator: anytype,
+            allocator: std.mem.Allocator,
             comptime fmt: []const u8,
             args: anytype,
         ) void {
@@ -176,7 +176,7 @@ pub fn Logger(
         /// Like `.fatal` but supports string formatting.
         pub fn fatalf(
             l: Self,
-            allocator: anytype,
+            allocator: std.mem.Allocator,
             exit_code: u8,
             comptime fmt: []const u8,
             args: anytype,
@@ -195,7 +195,7 @@ pub fn Logger(
         /// Like `.info` but supports string formatting.
         pub fn infof(
             l: Self,
-            allocator: anytype,
+            allocator: std.mem.Allocator,
             comptime fmt: []const u8,
             args: anytype,
         ) void {
@@ -212,7 +212,7 @@ pub fn Logger(
         /// Like `.warn but supports string formatting.
         pub fn warnf(
             l: Self,
-            allocator: anytype,
+            allocator: std.mem.Allocator,
             comptime fmt: []const u8,
             args: anytype,
         ) void {

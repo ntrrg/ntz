@@ -1,16 +1,19 @@
 // Copyright 2025 Miguel Angel Rivera Notararigo. All rights reserved.
 // This source code was released under the MIT license.
 
+const std = @import("std");
+const testing = std.testing;
+
 const ntz = @import("ntz");
-const testing = ntz.testing;
 
 test "ntz.Status" {
     const ally = testing.allocator;
 
-    var grand_parent = ntz.Status{ .allocator = ally };
-    defer grand_parent.deinit();
-    var parent = try grand_parent.sub();
-    var child = try parent.sub();
+    var grand_parent = ntz.Status{};
+    defer grand_parent.deinit(ally);
+    var parent = try grand_parent.sub(ally);
+    defer parent.deinit(ally);
+    var child = try parent.sub(ally);
 
     try testing.expect(!grand_parent.isDone());
     try testing.expect(!parent.isDone());

@@ -1,6 +1,26 @@
 #!/bin/sh
 
-exec podman run --rm -it \
-	-v "$PWD:$PWD" -w "$PWD" \
-	--security-opt seccomp=unconfined \
-		kcov/kcov kcov "$@"
+set -eu
+
+ENV_FILE="${ENV_FILE:-".env"}"
+
+CONTAINER_RUNTIME="${CONTAINER_RUNTIME:-"podman"}"
+CONTAINER_TAG="${CONTAINER_TAG:-"latest"}"
+CONTAINER_IMAGE="${CONTAINER_IMAGE:-"kcov/kcov:$CONTAINER_TAG"}"
+CONTAINER_USER="${CONTAINER_USER:-"$(id -u)"}"
+
+CONTAINER_CMD="
+	$CONTAINER_RUNTIME run --rm -it --network host
+		--security-opt seccomp=unconfined
+		-v $PWD:/src -w /src
+"
+
+if [ -f "$ENV_FILE" ]; then
+	CONTAINER_CMD="$CONTAINER_CMD --env-file $ENV_FILE"
+fi
+
+if [ "$("$CONTAINER_RUNTIME" --version | cut -F 1)" = "Docker" ]; then
+	CONTAINER_CMD="$CONTAINER_CMD -u $CONTAINER_USER"
+fi
+
+exec $CONTAINER_CMD "$CONTAINER_IMAGE" kcov "$@"

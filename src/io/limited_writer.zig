@@ -3,7 +3,6 @@
 
 const io = @import("root.zig");
 const types = @import("../types/root.zig");
-const errors = types.errors;
 
 /// Creates a writer that only writes an arbitrary amount of bytes.
 pub fn init(writer: anytype, comptime limit: usize) LimitedWriter(
@@ -18,8 +17,7 @@ pub fn LimitedWriter(comptime Writer: type, comptime limit: usize) type {
     return struct {
         const Self = @This();
 
-        pub const Error = WriterError;
-        pub const WriterError = errors.From(Writer);
+        pub const Error = Writer.Error;
 
         w: Writer,
         count: usize = 0,
@@ -34,7 +32,7 @@ pub fn LimitedWriter(comptime Writer: type, comptime limit: usize) type {
         /// Once the writer reaches its limit, it will discard all byte from
         /// subsequent calls. It is possible to reuse the writer by calling the
         /// `.reset` method.
-        pub fn write(lw: *Self, data: []const u8) WriterError!usize {
+        pub fn write(lw: *Self, data: []const u8) Error!usize {
             if (data.len == 0) return data.len;
             if (lw.count >= limit) return data.len;
 
@@ -44,7 +42,7 @@ pub fn LimitedWriter(comptime Writer: type, comptime limit: usize) type {
             return data.len;
         }
 
-        pub fn writer(lw: *Self) io.Writer(*Self, WriterError, write) {
+        pub fn writer(lw: *Self) io.Writer(*Self, Error, write) {
             return .{ .writer = lw };
         }
     };

@@ -12,8 +12,8 @@ const std = @import("std");
 pub fn init(
     writer: anytype,
     comptime Error: type,
-    comptime write_fn: fn (w: @TypeOf(writer), data: []const u8) Error!usize,
-) Writer(@TypeOf(writer), Error, write_fn) {
+    comptime writeFn: fn (w: @TypeOf(writer), data: []const u8) Error!usize,
+) Writer(@TypeOf(writer), Error, writeFn) {
     return .{ .writer = writer };
 }
 
@@ -21,7 +21,7 @@ pub fn init(
 pub fn Writer(
     comptime T: type,
     comptime WriteError: type,
-    comptime write_fn: fn (w: T, data: []const u8) WriteError!usize,
+    comptime writeFn: fn (w: T, data: []const u8) WriteError!usize,
 ) type {
     return struct {
         const Self = @This();
@@ -31,11 +31,46 @@ pub fn Writer(
 
         /// Writes the given data and returns the number of bytes processed.
         pub fn write(w: Self, data: []const u8) Error!usize {
-            return write_fn(w.writer, data);
+            return writeFn(w.writer, data);
         }
 
-        pub fn stdWriter(w: Self) std.io.GenericWriter(T, WriteError, write_fn) {
-            return .{ .context = w.writer };
+        // ////////////////
+        // std.Io.Writer //
+        // ////////////////
+
+        pub const StdWriter = struct {
+            w: T,
+            interface: std.Io.Writer,
+            err: ?Error = null,
+
+            fn drain(std_w: *std.Io.Writer, data: []const []const u8, splat: usize) std.io.Writer.Error!usize {
+                _ = splat;
+                const a: *@This() = @alignCast(@fieldParentPtr("interface", std_w));
+
+                const buffered = std_w.buffered();
+
+                if (buffered.len != 0) {
+                    return std_w.consume(writeFn(a.w, buffered) catch |err| {
+                        a.err = err;
+                        return error.WriteFailed;
+                    });
+                }
+
+                return writeFn(a.w, data[0]) catch |err| {
+                    a.err = err;
+                    return error.WriteFailed;
+                };
+            }
+        };
+
+        pub fn stdWriter(w: Self, buffer: []u8) StdWriter {
+            return .{
+                .w = w.writer,
+                .interface = .{
+                    .buffer = buffer,
+                    .vtable = &.{ .drain = StdWriter.drain },
+                },
+            };
         }
     };
 }

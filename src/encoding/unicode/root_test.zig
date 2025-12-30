@@ -1,9 +1,10 @@
 // Copyright 2024 Miguel Angel Rivera Notararigo. All rights reserved.
 // This source code was released under the MIT license.
 
-const ntz = @import("ntz");
-const testing = ntz.testing;
+const std = @import("std");
+const testing = std.testing;
 
+const ntz = @import("ntz");
 const unicode = ntz.encoding.unicode;
 
 test "ntz.encoding.unicode" {
@@ -17,9 +18,9 @@ test "ntz.encoding.unicode" {
 test "ntz.encoding.unicode.Codepoint.init" {
     _ = try unicode.Codepoint.init(0);
 
-    try testing.expectErr(
-        unicode.Codepoint.init(0x110000),
+    try testing.expectError(
         unicode.Codepoint.InitError.OutOfBounds,
+        unicode.Codepoint.init(0x110000),
     );
 
     _ = try unicode.Codepoint.init(0x10FFFF);
@@ -28,19 +29,19 @@ test "ntz.encoding.unicode.Codepoint.init" {
 
     _ = try unicode.Codepoint.init(0xD7FF);
 
-    try testing.expectErr(
+    try testing.expectError(
+        unicode.Codepoint.InitError.SurrogateCharacter,
         unicode.Codepoint.init(0xD800),
-        unicode.Codepoint.InitError.SurrogateCharacter,
     );
 
-    try testing.expectErr(
+    try testing.expectError(
+        unicode.Codepoint.InitError.SurrogateCharacter,
         unicode.Codepoint.init(0xDB88),
-        unicode.Codepoint.InitError.SurrogateCharacter,
     );
 
-    try testing.expectErr(
-        unicode.Codepoint.init(0xDFFF),
+    try testing.expectError(
         unicode.Codepoint.InitError.SurrogateCharacter,
+        unicode.Codepoint.init(0xDFFF),
     );
 
     _ = try unicode.Codepoint.init(0xE000);

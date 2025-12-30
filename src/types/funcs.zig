@@ -5,8 +5,30 @@
 //!
 //! Utilities for working with funcions and methods.
 
-/// Returns true if `T` has a `name` public method. `T` may be pointer `*T`, in
-/// which case, its child type will be used.
+/// Returns the infered error set from the return type of the given function.
+pub fn ErrorSet(comptime func: anytype) type {
+    const T = Return(func);
+    const ti = @typeInfo(T);
+    if (ti != .error_union) @compileError("function has no error set");
+
+    return ti.error_union.error_set;
+}
+
+/// Returns the return type of the given function.
+pub fn Return(comptime func: anytype) type {
+    const T = @TypeOf(func);
+    const ti = @typeInfo(T);
+
+    if (ti == .pointer and ti.pointer.size == .one)
+        return Return(ti.pointer.child);
+
+    if (ti != .@"fn") @compileError("argument is not a function");
+
+    return ti.@"fn".return_type orelse void;
+}
+
+/// Returns true if `T` has a `name` public method. If `T` is a pointer `*T`,
+/// its child type will be used.
 pub fn hasFn(comptime T: type, comptime name: [:0]const u8) bool {
     const ti = @typeInfo(T);
 
@@ -22,23 +44,4 @@ pub fn hasFn(comptime T: type, comptime name: [:0]const u8) bool {
         return false;
 
     return @typeInfo(@TypeOf(@field(T, name))) == .@"fn";
-}
-
-/// Returns the infered error set from the return type of the given function.
-pub fn ErrorSet(comptime func: anytype) type {
-    const T = Return(func);
-    const ti = @typeInfo(T);
-
-    return ti.error_union.error_set;
-}
-
-/// Returns the return type of the given function.
-pub fn Return(comptime func: anytype) type {
-    const T = @TypeOf(func);
-    const ti = @typeInfo(T);
-
-    if (ti == .pointer and ti.pointer.size == .one)
-        return Return(ti.pointer.child);
-
-    return ti.@"fn".return_type orelse void;
 }

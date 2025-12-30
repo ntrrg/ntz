@@ -1,10 +1,12 @@
 // Copyright 2023 Miguel Angel Rivera Notararigo. All rights reserved.
 // This source code was released under the MIT license.
 
+const std = @import("std");
+const testing = std.testing;
+
 const ntz = @import("ntz");
 const encoding = ntz.encoding;
 const ctxlog = encoding.ctxlog;
-const testing = ntz.testing;
 const types = ntz.types;
 const bytes = types.bytes;
 
@@ -19,7 +21,7 @@ test "ntz.logging.Logger" {
 
     const e = ctxlog.Encoder{};
 
-    const log = logging.initCustom(w, e, struct {
+    const log = logging.initWith(w, e, struct {
         level: []const u8,
 
         http: ?struct {
@@ -39,9 +41,9 @@ test "ntz.logging.Logger" {
     buf.clear();
     log.info("hello, world!");
 
-    try testing.expectEqlStrs(
-        buf.bytes(),
+    try testing.expectEqualStrings(
         "level=\"INFO\" msg=\"hello, world!\"\n",
+        buf.bytes(),
     );
 
     // Severity.
@@ -50,7 +52,7 @@ test "ntz.logging.Logger" {
     const warn_log = log.withSeverity(.warn);
     warn_log.info("hello, world!");
 
-    try testing.expectEqlStrs(buf.bytes(), "");
+    try testing.expectEqualStrings("", buf.bytes());
 
     // Scoping
 
@@ -63,14 +65,14 @@ test "ntz.logging.Logger" {
         .with("response.status", 200)
         .info("hello, request!");
 
-    try testing.expectEqlStrs(
-        buf.bytes(),
+    try testing.expectEqualStrings(
         "level=\"INFO\" http.request.method=\"GET\" http.request.url=\"http://localhost/\" http.response.status=200 msg=\"hello, request!\"\n",
+        buf.bytes(),
     );
 
     // onLog method.
 
-    const timed_log = logging.initCustom(w, e, struct {
+    const timed_log = logging.initWith(w, e, struct {
         const Self = @This();
 
         time: u64,
@@ -87,8 +89,8 @@ test "ntz.logging.Logger" {
     buf.clear();
     timed_log.err("hello, timed log!");
 
-    try testing.expectEqlStrs(
-        buf.bytes(),
+    try testing.expectEqualStrings(
         "time=42 level=\"ERROR\" msg=\"hello, timed log!\"\n",
+        buf.bytes(),
     );
 }

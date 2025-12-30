@@ -1,8 +1,10 @@
 // Copyright 2023 Miguel Angel Rivera Notararigo. All rights reserved.
 // This source code was released under the MIT license.
 
+const std = @import("std");
+const testing = std.testing;
+
 const ntz = @import("ntz");
-const testing = ntz.testing;
 const types = ntz.types;
 const bytes = types.bytes;
 
@@ -13,23 +15,23 @@ test "ntz.io.delimited_writer" {
 
     var buf = bytes.buffer(ally);
     defer buf.deinit();
-    var cw = io.countingWriter(&buf);
+    var cw = io.countingWriter(buf.writer());
 
-    var dw = io.delimitedWriter(&cw, ally, "\n");
+    var dw = io.delimitedWriter(cw.writer(), ally, "\n");
     defer dw.deinit();
 
     const in = "hello\nworld";
     var n = try dw.write(in);
-    try testing.expectEqlStrs(buf.bytes(), "hello\n");
-    try testing.expectEql(n, 11);
-    try testing.expectEql(cw.write_count, 1);
-    try testing.expectEql(cw.byte_count, 6);
+    try testing.expectEqualStrings("hello\n", buf.bytes());
+    try testing.expectEqual(11, n);
+    try testing.expectEqual(1, cw.write_count);
+    try testing.expectEqual(6, cw.byte_count);
 
     n = try dw.write("\n");
-    try testing.expectEqlStrs(buf.bytes(), in ++ "\n");
-    try testing.expectEql(n, 1);
-    try testing.expectEql(cw.write_count, 2);
-    try testing.expectEql(cw.byte_count, 12);
+    try testing.expectEqualStrings(in ++ "\n", buf.bytes());
+    try testing.expectEqual(1, n);
+    try testing.expectEqual(2, cw.write_count);
+    try testing.expectEqual(12, cw.byte_count);
 }
 
 test "ntz.io.delimited_writer: exclude delimiter" {
@@ -37,24 +39,24 @@ test "ntz.io.delimited_writer: exclude delimiter" {
 
     var buf = bytes.buffer(ally);
     defer buf.deinit();
-    var cw = io.countingWriter(&buf);
+    var cw = io.countingWriter(buf.writer());
 
-    var dw = io.delimitedWriter(&cw, ally, "\n");
+    var dw = io.delimitedWriter(cw.writer(), ally, "\n");
     dw.include = false;
     defer dw.deinit();
 
     const in = "hello\nworld\n!";
     var n = try dw.write(in);
-    try testing.expectEqlStrs(buf.bytes(), "helloworld");
-    try testing.expectEql(n, 13);
-    try testing.expectEql(cw.write_count, 2);
-    try testing.expectEql(cw.byte_count, 10);
+    try testing.expectEqualStrings("helloworld", buf.bytes());
+    try testing.expectEqual(13, n);
+    try testing.expectEqual(2, cw.write_count);
+    try testing.expectEqual(10, cw.byte_count);
 
     n = try dw.write("\n");
-    try testing.expectEqlStrs(buf.bytes(), "helloworld!");
-    try testing.expectEql(n, 1);
-    try testing.expectEql(cw.write_count, 3);
-    try testing.expectEql(cw.byte_count, 11);
+    try testing.expectEqualStrings("helloworld!", buf.bytes());
+    try testing.expectEqual(1, n);
+    try testing.expectEqual(3, cw.write_count);
+    try testing.expectEqual(11, cw.byte_count);
 }
 
 test "ntz.io.delimited_writer: empty delimiter" {
@@ -62,17 +64,17 @@ test "ntz.io.delimited_writer: empty delimiter" {
 
     var buf = bytes.buffer(ally);
     defer buf.deinit();
-    var cw = io.countingWriter(&buf);
+    var cw = io.countingWriter(buf.writer());
 
-    var dw = io.delimitedWriter(&cw, ally, "");
+    var dw = io.delimitedWriter(cw.writer(), ally, "");
     defer dw.deinit();
 
     const in = "hello, world!";
     const n = try dw.write(in);
-    try testing.expectEqlStrs(buf.bytes(), in);
-    try testing.expectEql(in.len, n);
-    try testing.expectEql(cw.write_count, 13);
-    try testing.expectEql(cw.byte_count, 13);
+    try testing.expectEqualStrings(in, buf.bytes());
+    try testing.expectEqual(n, in.len);
+    try testing.expectEqual(13, cw.write_count);
+    try testing.expectEqual(13, cw.byte_count);
 }
 
 test "ntz.io.delimited_writer: byte sequence delimiter" {
@@ -80,23 +82,23 @@ test "ntz.io.delimited_writer: byte sequence delimiter" {
 
     var buf = bytes.buffer(ally);
     defer buf.deinit();
-    var cw = io.countingWriter(&buf);
+    var cw = io.countingWriter(buf.writer());
 
-    var dw = io.delimitedWriter(&cw, ally, "--");
+    var dw = io.delimitedWriter(cw.writer(), ally, "--");
     defer dw.deinit();
 
     const in = "hello--world--!";
     var n = try dw.write(in);
-    try testing.expectEqlStrs(buf.bytes(), "hello--world--");
-    try testing.expectEql(n, 15);
-    try testing.expectEql(cw.write_count, 2);
-    try testing.expectEql(cw.byte_count, 14);
+    try testing.expectEqualStrings("hello--world--", buf.bytes());
+    try testing.expectEqual(15, n);
+    try testing.expectEqual(2, cw.write_count);
+    try testing.expectEqual(14, cw.byte_count);
 
     n = try dw.write("--");
-    try testing.expectEqlStrs(buf.bytes(), in ++ "--");
-    try testing.expectEql(n, 2);
-    try testing.expectEql(cw.write_count, 3);
-    try testing.expectEql(cw.byte_count, 17);
+    try testing.expectEqualStrings(in ++ "--", buf.bytes());
+    try testing.expectEqual(2, n);
+    try testing.expectEqual(3, cw.write_count);
+    try testing.expectEqual(17, cw.byte_count);
 }
 
 test "ntz.io.delimited_writer: partially written sequence delimiter" {
@@ -104,69 +106,69 @@ test "ntz.io.delimited_writer: partially written sequence delimiter" {
 
     var buf = bytes.buffer(ally);
     defer buf.deinit();
-    var cw = io.countingWriter(&buf);
+    var cw = io.countingWriter(buf.writer());
 
-    var dw = io.delimitedWriter(&cw, ally, "---");
+    var dw = io.delimitedWriter(cw.writer(), ally, "---");
     defer dw.deinit();
 
     const in = "hello---world--";
     var n = try dw.write(in);
-    try testing.expectEqlStrs(buf.bytes(), "hello---");
-    try testing.expectEql(n, 15);
-    try testing.expectEql(cw.write_count, 1);
-    try testing.expectEql(cw.byte_count, 8);
+    try testing.expectEqualStrings("hello---", buf.bytes());
+    try testing.expectEqual(15, n);
+    try testing.expectEqual(1, cw.write_count);
+    try testing.expectEqual(8, cw.byte_count);
 
     n = try dw.write("-!");
-    try testing.expectEqlStrs(buf.bytes(), in ++ "-");
-    try testing.expectEql(n, 2);
-    try testing.expectEql(cw.write_count, 2);
-    try testing.expectEql(cw.byte_count, 16);
+    try testing.expectEqualStrings(in ++ "-", buf.bytes());
+    try testing.expectEqual(2, n);
+    try testing.expectEqual(2, cw.write_count);
+    try testing.expectEqual(16, cw.byte_count);
 
     try dw.flush();
-    try testing.expectEqlStrs(buf.bytes(), in ++ "-!");
-    try testing.expectEql(cw.write_count, 3);
-    try testing.expectEql(cw.byte_count, 17);
+    try testing.expectEqualStrings(in ++ "-!", buf.bytes());
+    try testing.expectEqual(3, cw.write_count);
+    try testing.expectEqual(17, cw.byte_count);
 
     n = try dw.write("-");
-    try testing.expectEqlStrs(buf.bytes(), in ++ "-!");
-    try testing.expectEql(n, 1);
-    try testing.expectEql(cw.write_count, 3);
-    try testing.expectEql(cw.byte_count, 17);
+    try testing.expectEqualStrings(in ++ "-!", buf.bytes());
+    try testing.expectEqual(1, n);
+    try testing.expectEqual(3, cw.write_count);
+    try testing.expectEqual(17, cw.byte_count);
 
     n = try dw.write("-");
-    try testing.expectEqlStrs(buf.bytes(), in ++ "-!");
-    try testing.expectEql(n, 1);
-    try testing.expectEql(cw.write_count, 3);
-    try testing.expectEql(cw.byte_count, 17);
+    try testing.expectEqualStrings(in ++ "-!", buf.bytes());
+    try testing.expectEqual(1, n);
+    try testing.expectEqual(3, cw.write_count);
+    try testing.expectEqual(17, cw.byte_count);
 
     n = try dw.write("-");
-    try testing.expectEqlStrs(buf.bytes(), in ++ "-!---");
-    try testing.expectEql(n, 1);
-    try testing.expectEql(cw.write_count, 4);
-    try testing.expectEql(cw.byte_count, 20);
+    try testing.expectEqualStrings(in ++ "-!---", buf.bytes());
+    try testing.expectEqual(1, n);
+    try testing.expectEqual(4, cw.write_count);
+    try testing.expectEqual(20, cw.byte_count);
 
     n = try dw.write("-");
-    try testing.expectEqlStrs(buf.bytes(), in ++ "-!---");
-    try testing.expectEql(n, 1);
-    try testing.expectEql(cw.write_count, 4);
-    try testing.expectEql(cw.byte_count, 20);
+    try testing.expectEqualStrings(in ++ "-!---", buf.bytes());
+    try testing.expectEqual(1, n);
+    try testing.expectEqual(4, cw.write_count);
+    try testing.expectEqual(20, cw.byte_count);
 
     n = try dw.write("_");
-    try testing.expectEqlStrs(buf.bytes(), in ++ "-!---");
-    try testing.expectEql(n, 1);
-    try testing.expectEql(cw.write_count, 4);
-    try testing.expectEql(cw.byte_count, 20);
+    try testing.expectEqualStrings(in ++ "-!---", buf.bytes());
+    try testing.expectEqual(1, n);
+    try testing.expectEqual(4, cw.write_count);
+    try testing.expectEqual(20, cw.byte_count);
 
     n = try dw.write("-");
-    try testing.expectEqlStrs(buf.bytes(), in ++ "-!---");
-    try testing.expectEql(n, 1);
-    try testing.expectEql(cw.write_count, 4);
-    try testing.expectEql(cw.byte_count, 20);
+    try testing.expectEqualStrings(in ++ "-!---", buf.bytes());
+    try testing.expectEqual(1, n);
+    try testing.expectEqual(4, cw.write_count);
+    try testing.expectEqual(20, cw.byte_count);
 
     try dw.flush();
-    try testing.expectEqlStrs(buf.bytes(), in ++ "-!----_-");
-    try testing.expectEql(cw.write_count, 5);
-    try testing.expectEql(cw.byte_count, 23);
+    try testing.expectEqualStrings(in ++ "-!----_-", buf.bytes());
+    try testing.expectEqual(5, cw.write_count);
+    try testing.expectEqual(23, cw.byte_count);
 }
 
 test "ntz.io.delimited_writer: remove partially written sequence delimiter" {
@@ -174,68 +176,68 @@ test "ntz.io.delimited_writer: remove partially written sequence delimiter" {
 
     var buf = bytes.buffer(ally);
     defer buf.deinit();
-    var cw = io.countingWriter(&buf);
+    var cw = io.countingWriter(buf.writer());
 
-    var dw = io.delimitedWriter(&cw, ally, "---");
+    var dw = io.delimitedWriter(cw.writer(), ally, "---");
     dw.include = false;
     defer dw.deinit();
 
     const in = "hello---world--";
     var n = try dw.write(in);
-    try testing.expectEqlStrs(buf.bytes(), "hello");
-    try testing.expectEql(n, 15);
-    try testing.expectEql(cw.write_count, 1);
-    try testing.expectEql(cw.byte_count, 5);
+    try testing.expectEqualStrings("hello", buf.bytes());
+    try testing.expectEqual(15, n);
+    try testing.expectEqual(1, cw.write_count);
+    try testing.expectEqual(5, cw.byte_count);
 
     n = try dw.write("-!");
-    try testing.expectEqlStrs(buf.bytes(), "helloworld");
-    try testing.expectEql(n, 2);
-    try testing.expectEql(cw.write_count, 2);
-    try testing.expectEql(cw.byte_count, 10);
+    try testing.expectEqualStrings("helloworld", buf.bytes());
+    try testing.expectEqual(2, n);
+    try testing.expectEqual(2, cw.write_count);
+    try testing.expectEqual(10, cw.byte_count);
 
     try dw.flush();
-    try testing.expectEqlStrs(buf.bytes(), "helloworld!");
-    try testing.expectEql(cw.write_count, 3);
-    try testing.expectEql(cw.byte_count, 11);
+    try testing.expectEqualStrings("helloworld!", buf.bytes());
+    try testing.expectEqual(3, cw.write_count);
+    try testing.expectEqual(11, cw.byte_count);
 
     n = try dw.write("-");
-    try testing.expectEqlStrs(buf.bytes(), "helloworld!");
-    try testing.expectEql(n, 1);
-    try testing.expectEql(cw.write_count, 3);
-    try testing.expectEql(cw.byte_count, 11);
+    try testing.expectEqualStrings("helloworld!", buf.bytes());
+    try testing.expectEqual(1, n);
+    try testing.expectEqual(3, cw.write_count);
+    try testing.expectEqual(11, cw.byte_count);
 
     n = try dw.write("-");
-    try testing.expectEqlStrs(buf.bytes(), "helloworld!");
-    try testing.expectEql(n, 1);
-    try testing.expectEql(cw.write_count, 3);
-    try testing.expectEql(cw.byte_count, 11);
+    try testing.expectEqualStrings("helloworld!", buf.bytes());
+    try testing.expectEqual(1, n);
+    try testing.expectEqual(3, cw.write_count);
+    try testing.expectEqual(11, cw.byte_count);
 
     n = try dw.write("-");
-    try testing.expectEqlStrs(buf.bytes(), "helloworld!");
-    try testing.expectEql(n, 1);
-    try testing.expectEql(cw.write_count, 3);
-    try testing.expectEql(cw.byte_count, 11);
+    try testing.expectEqualStrings("helloworld!", buf.bytes());
+    try testing.expectEqual(1, n);
+    try testing.expectEqual(3, cw.write_count);
+    try testing.expectEqual(11, cw.byte_count);
 
     n = try dw.write("-");
-    try testing.expectEqlStrs(buf.bytes(), "helloworld!");
-    try testing.expectEql(n, 1);
-    try testing.expectEql(cw.write_count, 3);
-    try testing.expectEql(cw.byte_count, 11);
+    try testing.expectEqualStrings("helloworld!", buf.bytes());
+    try testing.expectEqual(1, n);
+    try testing.expectEqual(3, cw.write_count);
+    try testing.expectEqual(11, cw.byte_count);
 
     n = try dw.write("_");
-    try testing.expectEqlStrs(buf.bytes(), "helloworld!");
-    try testing.expectEql(n, 1);
-    try testing.expectEql(cw.write_count, 3);
-    try testing.expectEql(cw.byte_count, 11);
+    try testing.expectEqualStrings("helloworld!", buf.bytes());
+    try testing.expectEqual(1, n);
+    try testing.expectEqual(3, cw.write_count);
+    try testing.expectEqual(11, cw.byte_count);
 
     n = try dw.write("-");
-    try testing.expectEqlStrs(buf.bytes(), "helloworld!");
-    try testing.expectEql(n, 1);
-    try testing.expectEql(cw.write_count, 3);
-    try testing.expectEql(cw.byte_count, 11);
+    try testing.expectEqualStrings("helloworld!", buf.bytes());
+    try testing.expectEqual(1, n);
+    try testing.expectEqual(3, cw.write_count);
+    try testing.expectEqual(11, cw.byte_count);
 
     try dw.flush();
-    try testing.expectEqlStrs(buf.bytes(), "helloworld!-_-");
-    try testing.expectEql(cw.write_count, 4);
-    try testing.expectEql(cw.byte_count, 14);
+    try testing.expectEqualStrings("helloworld!-_-", buf.bytes());
+    try testing.expectEqual(4, cw.write_count);
+    try testing.expectEqual(14, cw.byte_count);
 }

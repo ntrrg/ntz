@@ -63,26 +63,26 @@ pub const Level = enum {
 pub const Logger = @import("logger.zig").Logger;
 
 /// Creates a simple logger using the standard error as output.
-pub fn init() Logger(std.fs.File.Writer, BasicEncoder, BasicContext, "") {
-    var l = initCustom(
-        io.stdErr().writer(),
+pub fn init() BasicLogger {
+    var l = initWith(
+        io.stderr(),
         BasicEncoder{},
         BasicContext,
     );
 
-    l.mutex = &io.std_err_mux;
+    l.mux = &io.stderr_mux;
     return l.withSeverity(.debug);
 }
 
 /// Creates a logger using the given writer as output.
-pub fn initCustom(
+pub fn initWith(
     writer: anytype,
     encoder: anytype,
     comptime Context: type,
 ) Logger(@TypeOf(writer), @TypeOf(encoder), Context, "") {
     return .{
-        .writer = writer,
-        .encoder = encoder,
+        .w = writer,
+        .enc = encoder,
     };
 }
 
@@ -99,15 +99,17 @@ pub const BasicContext = struct {
 pub const BasicEncoder = struct {
     const Self = @This();
 
-    pub fn encode(_: Self, writer: anytype, val: BasicContext) !void {
+    pub fn encode(_: Self, writer: anytype, value: BasicContext) !void {
         _ = try writer.write("[");
-        _ = try writer.write(val.level);
+        _ = try writer.write(value.level);
         _ = try writer.write("] ");
-        _ = try writer.write(val.msg);
+        _ = try writer.write(value.msg);
 
-        if (val.@"error") |err| {
+        if (value.@"error") |err| {
             _ = try writer.write(": ");
             _ = try writer.write(@errorName(err));
         }
     }
 };
+
+pub const BasicLogger = Logger(std.fs.File, BasicEncoder, BasicContext, "");

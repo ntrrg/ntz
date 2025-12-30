@@ -1,12 +1,22 @@
 // Copyright 2023 Miguel Angel Rivera Notararigo. All rights reserved.
 // This source code was released under the MIT license.
 
-const ntz = @import("ntz");
-const testing = ntz.testing;
+const std = @import("std");
+const testing = std.testing;
 
+const ntz = @import("ntz");
 const slices = ntz.types.slices;
 
 test "ntz.types.slices" {}
+
+// Child //
+
+test "ntz.types.slices.Child" {
+    try testing.expectEqual(u8, slices.Child([]u8));
+    try testing.expectEqual(u8, slices.Child([0]u8));
+    try testing.expectEqual(u8, slices.Child(*[0]u8));
+    try testing.expectEqual(u8, slices.Child([*:0]u8));
+}
 
 // append //
 
@@ -15,7 +25,7 @@ test "ntz.types.slices.append" {
 
     const got = try slices.append(u8, ally, "hello, world", '!');
     defer ally.free(got);
-    try testing.expectEqlSlcs(u8, got, "hello, world!");
+    try testing.expectEqualSlices(u8, "hello, world!", got);
 }
 
 test "ntz.types.slices.append: empty slice" {
@@ -23,33 +33,24 @@ test "ntz.types.slices.append: empty slice" {
 
     const got = try slices.append(u8, ally, "", 'M');
     defer ally.free(got);
-    try testing.expectEqlSlcs(u8, got, "M");
+    try testing.expectEqualSlices(u8, "M", got);
 }
 
 // as //
 
 test "ntz.types.slices.as" {
     const array = [_]u8{ 'a', 'b', 0 };
-    try testing.expectEql(@TypeOf(slices.as(array).?), []const u8);
-    try testing.expectEql(@TypeOf(slices.as(&array).?), []const u8);
-    try testing.expectEql(@TypeOf(slices.as("hello, world!").?), []const u8);
+    try testing.expectEqual([]const u8, @TypeOf(slices.as(array).?));
+    try testing.expectEqual([]const u8, @TypeOf(slices.as(&array).?));
+    try testing.expectEqual([]const u8, @TypeOf(slices.as("hello, world!").?));
 
     const mpz: [*:0]const u8 = array[0..2 :0];
     const slc = slices.as(mpz).?;
-    try testing.expectEql(@TypeOf(slc), []const u8);
-    try testing.expectEql(slc.len, 2);
+    try testing.expectEqual([]const u8, @TypeOf(slc));
+    try testing.expectEqual(2, slc.len);
 
     const mp: [*]const u8 = &array;
-    try testing.expectEql(slices.as(mp), null);
-}
-
-// Child //
-
-test "ntz.types.slices.Child" {
-    try testing.expectEql(slices.Child([]u8), u8);
-    try testing.expectEql(slices.Child([0]u8), u8);
-    try testing.expectEql(slices.Child(*[0]u8), u8);
-    try testing.expectEql(slices.Child([*:0]u8), u8);
+    try testing.expectEqual(null, slices.as(mp));
 }
 
 // concat //
@@ -59,7 +60,7 @@ test "ntz.types.slices.concat" {
 
     const got = try slices.concat(u8, ally, "hello, ", "world!");
     defer ally.free(got);
-    try testing.expectEqlSlcs(u8, got, "hello, world!");
+    try testing.expectEqualSlices(u8, "hello, world!", got);
 }
 
 test "ntz.types.slices.concat: empty" {
@@ -67,7 +68,7 @@ test "ntz.types.slices.concat: empty" {
 
     const got = try slices.concat(u8, ally, "", "");
     defer ally.free(got);
-    try testing.expectEqlSlcs(u8, got, "");
+    try testing.expectEqualSlices(u8, "", got);
 }
 
 test "ntz.types.slices.concat: empty these" {
@@ -75,7 +76,7 @@ test "ntz.types.slices.concat: empty these" {
 
     const got = try slices.concat(u8, ally, "", "world");
     defer ally.free(got);
-    try testing.expectEqlSlcs(u8, got, "world");
+    try testing.expectEqualSlices(u8, "world", got);
 }
 
 test "ntz.types.slices.concat: empty those" {
@@ -83,7 +84,7 @@ test "ntz.types.slices.concat: empty those" {
 
     const got = try slices.concat(u8, ally, "hello", "");
     defer ally.free(got);
-    try testing.expectEqlSlcs(u8, got, "hello");
+    try testing.expectEqualSlices(u8, "hello", got);
 }
 
 // concatMany //
@@ -93,7 +94,7 @@ test "ntz.types.slices.concatMany" {
 
     const got = try slices.concatMany(u8, ally, &.{ "hello", ", ", "world", "!" });
     defer ally.free(got);
-    try testing.expectEqlSlcs(u8, got, "hello, world!");
+    try testing.expectEqualSlices(u8, "hello, world!", got);
 }
 
 test "ntz.types.slices.concatMany: empty" {
@@ -101,7 +102,7 @@ test "ntz.types.slices.concatMany: empty" {
 
     const got = try slices.concatMany(u8, ally, &.{});
     defer ally.free(got);
-    try testing.expectEqlSlcs(u8, got, "");
+    try testing.expectEqualSlices(u8, "", got);
 }
 
 test "ntz.types.slices.concatMany: empty slices" {
@@ -109,7 +110,7 @@ test "ntz.types.slices.concatMany: empty slices" {
 
     const got = try slices.concatMany(u8, ally, &.{ "", "" });
     defer ally.free(got);
-    try testing.expectEqlSlcs(u8, got, "");
+    try testing.expectEqualSlices(u8, "", got);
 }
 
 test "ntz.types.slices.concatMany: some empty slices" {
@@ -117,7 +118,7 @@ test "ntz.types.slices.concatMany: some empty slices" {
 
     const got = try slices.concatMany(u8, ally, &.{ "", "world" });
     defer ally.free(got);
-    try testing.expectEqlSlcs(u8, got, "world");
+    try testing.expectEqualSlices(u8, "world", got);
 }
 
 test "ntz.types.slices.concatMany: empty edges" {
@@ -125,7 +126,7 @@ test "ntz.types.slices.concatMany: empty edges" {
 
     const got = try slices.concatMany(u8, ally, &.{ "", "hello", "" });
     defer ally.free(got);
-    try testing.expectEqlSlcs(u8, got, "hello");
+    try testing.expectEqualSlices(u8, "hello", got);
 }
 
 // copy //
@@ -134,12 +135,12 @@ test "ntz.types.slices.copy" {
     const src = "abcde";
     var dst: [src.len]u8 = undefined;
     var n = slices.copy(u8, &dst, src);
-    try testing.expectEqlSlcs(u8, &dst, src);
-    try testing.expectEql(n, src.len);
+    try testing.expectEqualSlices(u8, src, &dst);
+    try testing.expectEqual(src.len, n);
 
     n = slices.copyAt(u8, 3, &dst, "ab");
-    try testing.expectEqlSlcs(u8, &dst, "abcab");
-    try testing.expectEql(n, 2);
+    try testing.expectEqualSlices(u8, "abcab", &dst);
+    try testing.expectEqual(2, n);
 }
 
 // copyLtr //
@@ -149,19 +150,19 @@ test "ntz.types.slices.copyLtr" {
     var dst: [src.len]u8 = undefined;
     var n = slices.copyLtr(u8, &dst, src);
 
-    try testing.expectEqlSlcs(u8, &dst, src);
-    try testing.expectEql(n, src.len);
+    try testing.expectEqualSlices(u8, src, &dst);
+    try testing.expectEqual(src.len, n);
 
     n = slices.copyLtr(u8, dst[0..3], dst[2..]);
 
-    try testing.expectEqlSlcs(u8, &dst, "cdede");
-    try testing.expectEql(n, 3);
+    try testing.expectEqualSlices(u8, "cdede", &dst);
+    try testing.expectEqual(3, n);
 
     _ = slices.copyLtr(u8, &dst, src);
     n = slices.copyLtr(u8, dst[2..], dst[0..3]);
 
-    try testing.expectEqlSlcs(u8, &dst, "ababa");
-    try testing.expectEql(n, 3);
+    try testing.expectEqualSlices(u8, "ababa", &dst);
+    try testing.expectEqual(3, n);
 }
 
 // copyMany //
@@ -173,8 +174,8 @@ test "ntz.types.slices.copyMany" {
     var dst: [5]u8 = undefined;
     const n = slices.copyMany(u8, &dst, &.{ src1, src2, src3 });
 
-    try testing.expectEqlSlcs(u8, &dst, "abcde");
-    try testing.expectEql(n, 5);
+    try testing.expectEqualSlices(u8, "abcde", &dst);
+    try testing.expectEqual(5, n);
 }
 
 // copyRtl //
@@ -184,34 +185,34 @@ test "ntz.types.slices.copyRtl" {
     var dst: [src.len]u8 = undefined;
     var n = slices.copyRtl(u8, &dst, src);
 
-    try testing.expectEqlSlcs(u8, &dst, src);
-    try testing.expectEql(n, src.len);
+    try testing.expectEqualSlices(u8, src, &dst);
+    try testing.expectEqual(src.len, n);
 
     n = slices.copyRtl(u8, dst[0..3], dst[2..]);
 
-    try testing.expectEqlSlcs(u8, &dst, "edede");
-    try testing.expectEql(n, 3);
+    try testing.expectEqualSlices(u8, "edede", &dst);
+    try testing.expectEqual(3, n);
 
     _ = slices.copyRtl(u8, &dst, src);
     n = slices.copyRtl(u8, dst[2..], dst[0..3]);
 
-    try testing.expectEqlSlcs(u8, &dst, "ababc");
-    try testing.expectEql(n, 3);
+    try testing.expectEqualSlices(u8, "ababc", &dst);
+    try testing.expectEqual(3, n);
 }
 
 // count //
 
 test "ntz.types.slices.count" {
-    try testing.expectEql(slices.count(u8, "asd", 'a'), 1);
-    try testing.expectEql(slices.count(u8, "asd", 's'), 1);
-    try testing.expectEql(slices.count(u8, "asd", 'd'), 1);
-    try testing.expectEql(slices.count(u8, "asd", 'f'), 0);
-    try testing.expectEql(slices.count(u8, "www", 'w'), 3);
+    try testing.expectEqual(1, slices.count(u8, "asd", 'a'));
+    try testing.expectEqual(1, slices.count(u8, "asd", 's'));
+    try testing.expectEqual(1, slices.count(u8, "asd", 'd'));
+    try testing.expectEqual(0, slices.count(u8, "asd", 'f'));
+    try testing.expectEqual(3, slices.count(u8, "www", 'w'));
 
-    try testing.expectEql(slices.countAt(u8, 1, "asd", 'a'), 0);
-    try testing.expectEql(slices.countAt(u8, 0, "www", 'w'), 3);
-    try testing.expectEql(slices.countAt(u8, 1, "www", 'w'), 2);
-    try testing.expectEql(slices.countAt(u8, 2, "www", 'w'), 1);
+    try testing.expectEqual(0, slices.countAt(u8, 1, "asd", 'a'));
+    try testing.expectEqual(3, slices.countAt(u8, 0, "www", 'w'));
+    try testing.expectEqual(2, slices.countAt(u8, 1, "www", 'w'));
+    try testing.expectEqual(1, slices.countAt(u8, 2, "www", 'w'));
 }
 
 // endsWith //
@@ -285,53 +286,53 @@ test "ntz.types.slices.equalAny: no slices" {
 // find //
 
 test "ntz.types.slices.find" {
-    try testing.expectEql(slices.find(u8, "asd", 'a'), 0);
-    try testing.expectEql(slices.find(u8, "asd", 's'), 1);
-    try testing.expectEql(slices.find(u8, "asd", 'd'), 2);
-    try testing.expectEql(slices.find(u8, "asd", 'f'), null);
+    try testing.expectEqual(0, slices.find(u8, "asd", 'a'));
+    try testing.expectEqual(1, slices.find(u8, "asd", 's'));
+    try testing.expectEqual(2, slices.find(u8, "asd", 'd'));
+    try testing.expectEqual(null, slices.find(u8, "asd", 'f'));
 
-    try testing.expectEql(slices.findAt(u8, 1, "asd", 'a'), null);
-    try testing.expectEql(slices.findAt(u8, 3, "asd", 'd'), null);
-    try testing.expectEql(slices.findAt(u8, 0, "asd", 'f'), null);
-    try testing.expectEql(slices.findAt(u8, 3, "asd", 'f'), null);
+    try testing.expectEqual(null, slices.findAt(u8, 1, "asd", 'a'));
+    try testing.expectEqual(null, slices.findAt(u8, 3, "asd", 'd'));
+    try testing.expectEqual(null, slices.findAt(u8, 0, "asd", 'f'));
+    try testing.expectEqual(null, slices.findAt(u8, 3, "asd", 'f'));
 }
 
 // findAny //
 
 test "ntz.types.slices.findAny" {
-    try testing.expectEql(
+    try testing.expectEqual(
+        slices.FindAnyResult(u8){ .index = 0, .value = 'a' },
         slices.findAny(u8, "asd", &.{ 'a', 's', 'd' }),
-        .{ .index = 0, .value = 'a' },
     );
 
-    try testing.expectEql(slices.findAny(u8, "asd", &.{}), null);
-    try testing.expectEql(slices.findAny(u8, "asd", &.{'f'}), null);
-    try testing.expectEql(slices.findAny(u8, "asd", &.{ 'f', 'g' }), null);
+    try testing.expectEqual(null, slices.findAny(u8, "asd", &.{}));
+    try testing.expectEqual(null, slices.findAny(u8, "asd", &.{'f'}));
+    try testing.expectEqual(null, slices.findAny(u8, "asd", &.{ 'f', 'g' }));
 
-    try testing.expectEql(
+    try testing.expectEqual(
+        slices.FindAnyResult(u8){ .index = 1, .value = 's' },
         slices.findAnyAt(u8, 1, "asd", &.{ 'a', 's' }),
-        .{ .index = 1, .value = 's' },
     );
 
-    try testing.expectEql(slices.findAnyAt(u8, 2, "asd", &.{ 'a', 's' }), null);
+    try testing.expectEqual(null, slices.findAnyAt(u8, 2, "asd", &.{ 'a', 's' }));
 }
 
 // findSeq //
 
 test "ntz.types.slices.findSeq" {
-    try testing.expectEql(slices.findSeq(u8, "asd", "a"), 0);
-    try testing.expectEql(slices.findSeq(u8, "asd", "as"), 0);
-    try testing.expectEql(slices.findSeq(u8, "asd", "asd"), 0);
-    try testing.expectEql(slices.findSeq(u8, "asd", "s"), 1);
-    try testing.expectEql(slices.findSeq(u8, "asd", "sd"), 1);
-    try testing.expectEql(slices.findSeq(u8, "asd", "d"), 2);
-    try testing.expectEql(slices.findSeq(u8, "asd", "f"), null);
+    try testing.expectEqual(0, slices.findSeq(u8, "asd", "a"));
+    try testing.expectEqual(0, slices.findSeq(u8, "asd", "as"));
+    try testing.expectEqual(0, slices.findSeq(u8, "asd", "asd"));
+    try testing.expectEqual(1, slices.findSeq(u8, "asd", "s"));
+    try testing.expectEqual(1, slices.findSeq(u8, "asd", "sd"));
+    try testing.expectEqual(2, slices.findSeq(u8, "asd", "d"));
+    try testing.expectEqual(null, slices.findSeq(u8, "asd", "f"));
 
-    try testing.expectEql(slices.findSeqAt(u8, 1, "asd", "a"), null);
-    try testing.expectEql(slices.findSeqAt(u8, 1, "asd", "as"), null);
-    try testing.expectEql(slices.findSeqAt(u8, 3, "asd", "d"), null);
-    try testing.expectEql(slices.findSeqAt(u8, 0, "asd", "f"), null);
-    try testing.expectEql(slices.findSeqAt(u8, 3, "asd", "f"), null);
+    try testing.expectEqual(null, slices.findSeqAt(u8, 1, "asd", "a"));
+    try testing.expectEqual(null, slices.findSeqAt(u8, 1, "asd", "as"));
+    try testing.expectEqual(null, slices.findSeqAt(u8, 3, "asd", "d"));
+    try testing.expectEqual(null, slices.findSeqAt(u8, 0, "asd", "f"));
+    try testing.expectEqual(null, slices.findSeqAt(u8, 3, "asd", "f"));
 }
 
 // is //
@@ -363,47 +364,47 @@ test "ntz.types.slices.is" {
 
 test "ntz.types.slices.split" {
     var first, var rest = slices.split(u8, "asd", 'a');
-    try testing.expectEqlSlcs(u8, first, "");
-    try testing.expectEqlSlcs(u8, rest, "sd");
+    try testing.expectEqualSlices(u8, "", first);
+    try testing.expectEqualSlices(u8, "sd", rest);
 
     first, rest = slices.split(u8, "asd", 's');
-    try testing.expectEqlSlcs(u8, first, "a");
-    try testing.expectEqlSlcs(u8, rest, "d");
+    try testing.expectEqualSlices(u8, "a", first);
+    try testing.expectEqualSlices(u8, "d", rest);
 
     first, rest = slices.split(u8, "asd", 'd');
-    try testing.expectEqlSlcs(u8, first, "as");
-    try testing.expectEqlSlcs(u8, rest, "");
+    try testing.expectEqualSlices(u8, "as", first);
+    try testing.expectEqualSlices(u8, "", rest);
 
     first, rest = slices.split(u8, "asd", 'f');
-    try testing.expectEqlSlcs(u8, first, "asd");
-    try testing.expectEqlSlcs(u8, rest, "");
+    try testing.expectEqualSlices(u8, "asd", first);
+    try testing.expectEqualSlices(u8, "", rest);
 
     first, rest = slices.splitAt(u8, 1, "asd", 'a');
-    try testing.expectEqlSlcs(u8, first, "sd");
-    try testing.expectEqlSlcs(u8, rest, "");
+    try testing.expectEqualSlices(u8, "sd", first);
+    try testing.expectEqualSlices(u8, "", rest);
 
     first, rest = slices.splitAt(u8, 2, "asd", 'd');
-    try testing.expectEqlSlcs(u8, first, "");
-    try testing.expectEqlSlcs(u8, rest, "");
+    try testing.expectEqualSlices(u8, "", first);
+    try testing.expectEqualSlices(u8, "", rest);
 
     first, rest = slices.splitAt(u8, 0, "asd", 'f');
-    try testing.expectEqlSlcs(u8, first, "asd");
-    try testing.expectEqlSlcs(u8, rest, "");
+    try testing.expectEqualSlices(u8, "asd", first);
+    try testing.expectEqualSlices(u8, "", rest);
 }
 
 // splitCount //
 
 test "ntz.types.slices.splitCount" {
-    try testing.expectEql(slices.splitCount(u8, "asd", 'a'), 2);
-    try testing.expectEql(slices.splitCount(u8, "asd", 's'), 2);
-    try testing.expectEql(slices.splitCount(u8, "asd", 'd'), 2);
-    try testing.expectEql(slices.splitCount(u8, "asd", 'f'), 1);
-    try testing.expectEql(slices.splitCount(u8, "awswd", 'w'), 3);
-    try testing.expectEql(slices.splitCount(u8, "wawswd", 'w'), 4);
-    try testing.expectEql(slices.splitCount(u8, "awswdw", 'w'), 4);
-    try testing.expectEql(slices.splitCount(u8, "awswdwf", 'w'), 4);
-    try testing.expectEql(slices.splitCount(u8, "www", 'w'), 4);
-    try testing.expectEql(slices.splitCount(u8, "", 'a'), 1);
+    try testing.expectEqual(2, slices.splitCount(u8, "asd", 'a'));
+    try testing.expectEqual(2, slices.splitCount(u8, "asd", 's'));
+    try testing.expectEqual(2, slices.splitCount(u8, "asd", 'd'));
+    try testing.expectEqual(1, slices.splitCount(u8, "asd", 'f'));
+    try testing.expectEqual(3, slices.splitCount(u8, "awswd", 'w'));
+    try testing.expectEqual(4, slices.splitCount(u8, "wawswd", 'w'));
+    try testing.expectEqual(4, slices.splitCount(u8, "awswdw", 'w'));
+    try testing.expectEqual(4, slices.splitCount(u8, "awswdwf", 'w'));
+    try testing.expectEqual(4, slices.splitCount(u8, "www", 'w'));
+    try testing.expectEqual(1, slices.splitCount(u8, "", 'a'));
 }
 
 // splitn //
@@ -413,78 +414,78 @@ test "ntz.types.slices.splitn" {
 
     var got = try slices.splitn(u8, 1, &out, "asd", 'a');
     var want: []const []const u8 = &.{ "", "sd" };
-    for (0..want.len) |i| try testing.expectEqlSlcs(u8, got[i], want[i]);
-    try testing.expectEql(got.len, 2);
+    for (0..want.len) |i| try testing.expectEqualSlices(u8, want[i], got[i]);
+    try testing.expectEqual(2, got.len);
 
     got = try slices.splitn(u8, 1, &out, "asd", 's');
     want = &.{ "a", "d" };
-    for (0..want.len) |i| try testing.expectEqlSlcs(u8, got[i], want[i]);
-    try testing.expectEql(got.len, 2);
+    for (0..want.len) |i| try testing.expectEqualSlices(u8, want[i], got[i]);
+    try testing.expectEqual(2, got.len);
 
     got = try slices.splitn(u8, 1, &out, "asd", 'd');
     want = &.{ "as", "" };
-    for (0..want.len) |i| try testing.expectEqlSlcs(u8, got[i], want[i]);
-    try testing.expectEql(got.len, 2);
+    for (0..want.len) |i| try testing.expectEqualSlices(u8, want[i], got[i]);
+    try testing.expectEqual(2, got.len);
 
     got = try slices.splitn(u8, 1, &out, "asd", 'f');
     want = &.{"asd"};
-    for (0..want.len) |i| try testing.expectEqlSlcs(u8, got[i], want[i]);
-    try testing.expectEql(got.len, 1);
+    for (0..want.len) |i| try testing.expectEqualSlices(u8, want[i], got[i]);
+    try testing.expectEqual(1, got.len);
 
     got = try slices.splitn(u8, 2, &out, "awswd", 'w');
     want = &.{ "a", "s", "d" };
-    for (0..want.len) |i| try testing.expectEqlSlcs(u8, got[i], want[i]);
-    try testing.expectEql(got.len, 3);
+    for (0..want.len) |i| try testing.expectEqualSlices(u8, want[i], got[i]);
+    try testing.expectEqual(3, got.len);
 
     got = try slices.splitn(u8, 3, &out, "wawswd", 'w');
     want = &.{ "", "a", "s", "d" };
-    for (0..want.len) |i| try testing.expectEqlSlcs(u8, got[i], want[i]);
-    try testing.expectEql(got.len, 4);
+    for (0..want.len) |i| try testing.expectEqualSlices(u8, want[i], got[i]);
+    try testing.expectEqual(4, got.len);
 
     got = try slices.splitn(u8, 3, &out, "awswdw", 'w');
     want = &.{ "a", "s", "d", "" };
-    for (0..want.len) |i| try testing.expectEqlSlcs(u8, got[i], want[i]);
-    try testing.expectEql(got.len, 4);
+    for (0..want.len) |i| try testing.expectEqualSlices(u8, want[i], got[i]);
+    try testing.expectEqual(4, got.len);
 
     got = try slices.splitn(u8, 1, &out, "awswd", 'w');
     want = &.{ "a", "swd" };
-    for (0..want.len) |i| try testing.expectEqlSlcs(u8, got[i], want[i]);
-    try testing.expectEql(got.len, 2);
+    for (0..want.len) |i| try testing.expectEqualSlices(u8, want[i], got[i]);
+    try testing.expectEqual(2, got.len);
 
     got = try slices.splitn(u8, 2, &out, "awswdwf", 'w');
     want = &.{ "a", "s", "dwf" };
-    for (0..want.len) |i| try testing.expectEqlSlcs(u8, got[i], want[i]);
-    try testing.expectEql(got.len, 3);
+    for (0..want.len) |i| try testing.expectEqualSlices(u8, want[i], got[i]);
+    try testing.expectEqual(3, got.len);
 
     got = try slices.splitn(u8, 0, &out, "www", 'w');
     want = &.{"www"};
-    for (0..want.len) |i| try testing.expectEqlSlcs(u8, got[i], want[i]);
-    try testing.expectEql(got.len, 1);
+    for (0..want.len) |i| try testing.expectEqualSlices(u8, want[i], got[i]);
+    try testing.expectEqual(1, got.len);
 
     got = try slices.splitn(u8, 1, &out, "", 'w');
     want = &.{""};
-    for (0..want.len) |i| try testing.expectEqlSlcs(u8, got[i], want[i]);
-    try testing.expectEql(got.len, 1);
+    for (0..want.len) |i| try testing.expectEqualSlices(u8, want[i], got[i]);
+    try testing.expectEqual(1, got.len);
 
-    try testing.expectErr(
+    try testing.expectError(
+        slices.SplitError.OutOfSpace,
         slices.splitn(u8, 0, out[0..0], "asd", 's'),
-        slices.SplitError.OutOfSpace,
     );
 
-    try testing.expectErr(
+    try testing.expectError(
+        slices.SplitError.OutOfSpace,
         slices.splitn(u8, 1, out[0..1], "asd", 's'),
-        slices.SplitError.OutOfSpace,
     );
 
-    try testing.expectErr(
-        slices.splitn(u8, 1, out[0..1], "asdf", 's'),
+    try testing.expectError(
         slices.SplitError.OutOfSpace,
+        slices.splitn(u8, 1, out[0..1], "asdf", 's'),
     );
 
     got = try slices.splitnAt(u8, 2, 1, &out, "asdf", 's');
     want = &.{"df"};
-    for (0..want.len) |i| try testing.expectEqlSlcs(u8, got[i], want[i]);
-    try testing.expectEql(got.len, 1);
+    for (0..want.len) |i| try testing.expectEqualSlices(u8, want[i], got[i]);
+    try testing.expectEqual(1, got.len);
 }
 
 // startsWith //
@@ -498,38 +499,6 @@ test "ntz.types.slices.startsWith" {
     try testing.expect(!slices.startsWith(u8, "asd", "qwer"));
 }
 
-// ///////////
-// Iterator //
-// ///////////
-
-test "ntz.types.slices.Iterator" {
-    var it = slices.iterator("hello, world!");
-    try testing.expectEql(it.next(), 'h');
-    try testing.expectEql(it.peek(), 'e');
-    try testing.expectEql(it.peekN(2), 'l');
-    try testing.expectEql(it.peekN(3), 'l');
-    try testing.expect(it.skip());
-    try testing.expectEql(it.peek(), 'l');
-    try testing.expectEql(it.peekN(2), 'l');
-    try testing.expectEql(it.peekN(3), 'o');
-    try testing.expect(it.skipN(10));
-    try testing.expectEql(it.peek(), '!');
-    try testing.expectEql(it.next(), '!');
-    try testing.expectEql(it.peek(), null);
-    try testing.expectEql(it.peekN(2), null);
-    try testing.expectEql(it.peekN(3), null);
-    try testing.expect(!it.skip());
-    try testing.expect(!it.skipN(2));
-    try testing.expect(!it.skipN(3));
-
-    it.index = 0;
-    try testing.expectEql(it.peekN(13), '!');
-    try testing.expect(it.skipN(13));
-    try testing.expectEql(it.next(), null);
-    try testing.expectEql(it.peek(), null);
-    try testing.expect(!it.skip());
-}
-
 // ////////
 // Slice //
 // ////////
@@ -540,57 +509,61 @@ test "ntz.types.slices.Slice" {
     var slc = (slices.Slice(u8){}).managed(ally);
     defer slc.deinit();
 
-    try testing.expectEql(slc.cap(), 0);
+    try testing.expectEqual(0, slc.cap());
 
     try slc.appendMany("hello, world");
-    try testing.expectEqlBytes(slc.items(), "hello, world");
-    try testing.expectEql(slc.len(), 12);
-    try testing.expectEql(slc.cap(), 12);
-    try testing.expectEql(slc.available(), 0);
+    try testing.expectEqualSlices(u8, "hello, world", slc.items());
+    try testing.expectEqual(12, slc.len());
+    try testing.expectEqual(12, slc.cap());
+    try testing.expectEqual(0, slc.available());
 
     try slc.append('!');
-    try testing.expectEqlBytes(slc.items(), "hello, world!");
-    try testing.expectEql(slc.len(), 13);
-    try testing.expectEql(slc.cap(), 24);
-    try testing.expectEql(slc.available(), 11);
+    try testing.expectEqualSlices(u8, "hello, world!", slc.items());
+    try testing.expectEqual(13, slc.len());
+    try testing.expectEqual(24, slc.cap());
+    try testing.expectEqual(11, slc.available());
 
     try slc.appendMany(" and bye..");
-    try testing.expectEqlBytes(slc.items(), "hello, world! and bye..");
-    try testing.expectEql(slc.len(), 23);
-    try testing.expectEql(slc.cap(), 24);
-    try testing.expectEql(slc.available(), 1);
+    try testing.expectEqualSlices(u8, "hello, world! and bye..", slc.items());
+    try testing.expectEqual(23, slc.len());
+    try testing.expectEqual(24, slc.cap());
+    try testing.expectEqual(1, slc.available());
 
     slc.clear();
-    try testing.expectEql(slc.len(), 0);
-    try testing.expectEql(slc.cap(), 24);
-    try testing.expectEql(slc.available(), 24);
+    try testing.expectEqual(0, slc.len());
+    try testing.expectEqual(24, slc.cap());
+    try testing.expectEqual(24, slc.available());
 
     try slc.appendMany("hello, world!");
     try slc.resize(12);
-    try testing.expectEqlBytes(slc.items(), "hello, world");
-    try testing.expectEql(slc.len(), 12);
-    try testing.expectEql(slc.cap(), 24);
-    try testing.expectEql(slc.available(), 12);
+    try testing.expectEqualSlices(u8, "hello, world", slc.items());
+    try testing.expectEqual(12, slc.len());
+    try testing.expectEqual(24, slc.cap());
+    try testing.expectEqual(12, slc.available());
 
     try slc.setCapacity(12);
-    try testing.expectEqlBytes(slc.items(), "hello, world");
-    try testing.expectEql(slc.len(), 12);
-    try testing.expectEql(slc.cap(), 12);
-    try testing.expectEql(slc.available(), 0);
+    try testing.expectEqualSlices(u8, "hello, world", slc.items());
+    try testing.expectEqual(12, slc.len());
+    try testing.expectEqual(12, slc.cap());
+    try testing.expectEqual(0, slc.available());
 
     try slc.setCapacity(0);
-    try testing.expectEql(slc.len(), 0);
-    try testing.expectEql(slc.cap(), 0);
-    try testing.expectEql(slc.available(), 0);
+    try testing.expectEqual(0, slc.len());
+    try testing.expectEqual(0, slc.cap());
+    try testing.expectEqual(0, slc.available());
 
     try slc.setCapacity(1);
-    try testing.expectEql(slc.len(), 0);
-    try testing.expectEql(slc.cap(), 1);
-    try testing.expectEql(slc.available(), 1);
+    try testing.expectEqual(0, slc.len());
+    try testing.expectEqual(1, slc.cap());
+    try testing.expectEqual(1, slc.available());
+
+    const elem = try slc.appendAndReturn('M');
+    try testing.expectEqual(&slc.slc.ptr[0], elem);
+    slc.clear();
 
     try slc.appendSlices(&.{ "hello", ", ", "world", "!" });
-    try testing.expectEqlBytes(slc.items(), "hello, world!");
-    try testing.expectEql(slc.len(), 13);
-    try testing.expectEql(slc.cap(), 13);
-    try testing.expectEql(slc.available(), 0);
+    try testing.expectEqualSlices(u8, "hello, world!", slc.items());
+    try testing.expectEqual(13, slc.len());
+    try testing.expectEqual(13, slc.cap());
+    try testing.expectEqual(0, slc.available());
 }

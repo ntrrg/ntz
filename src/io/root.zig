@@ -10,14 +10,14 @@ const std = @import("std");
 const types = @import("../types/root.zig");
 const funcs = types.funcs;
 
-pub var std_in_mux: std.Thread.Mutex = .{};
-pub const stdIn = std.io.getStdIn;
+pub var stdin_mux: std.Thread.Mutex = .{};
+pub const stdin = std.fs.File.stdin;
 
-pub var std_out_mux: std.Thread.Mutex = .{};
-pub const stdOut = std.io.getStdOut;
+pub var stdout_mux: std.Thread.Mutex = .{};
+pub const stdout = std.fs.File.stdout;
 
-pub var std_err_mux: std.Thread.Mutex = .{};
-pub const stdErr = std.io.getStdErr;
+pub var stderr_mux: std.Thread.Mutex = .{};
+pub const stderr = std.fs.File.stderr;
 
 // //////////
 // Writers //

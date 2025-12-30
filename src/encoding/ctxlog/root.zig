@@ -12,9 +12,10 @@ const unicode = encoding.unicode;
 const utf8 = unicode.utf8;
 const types = @import("../../types/root.zig");
 const bytes = types.bytes;
-const errors = types.errors;
 const funcs = types.funcs;
 const slices = types.slices;
+
+const field_size = 64;
 
 pub const Encoder = struct {
     const Self = @This();
@@ -59,7 +60,7 @@ pub const Encoder = struct {
         e: Self,
         writer: anytype,
         value: anytype,
-    ) (EncodeError || errors.From(@TypeOf(writer)))!void {
+    ) (EncodeError || @TypeOf(writer).Error)!void {
         const T = @TypeOf(value);
         const ti = @typeInfo(T);
 
@@ -89,7 +90,7 @@ pub const Encoder = struct {
         _: Self,
         writer: anytype,
         value: bool,
-    ) errors.From(@TypeOf(writer))!void {
+    ) @TypeOf(writer).Error!void {
         _ = try writer.write(if (value) "true" else "false");
     }
 
@@ -97,7 +98,7 @@ pub const Encoder = struct {
         e: Self,
         writer: anytype,
         value: anytype,
-    ) errors.From(@TypeOf(writer))!void {
+    ) @TypeOf(writer).Error!void {
         return e.encodeString(writer, @tagName(value));
     }
 
@@ -105,7 +106,7 @@ pub const Encoder = struct {
         e: Self,
         writer: anytype,
         value: anyerror,
-    ) errors.From(@TypeOf(writer))!void {
+    ) @TypeOf(writer).Error!void {
         return e.encodeString(writer, @errorName(value));
     }
 
@@ -113,7 +114,7 @@ pub const Encoder = struct {
         e: Self,
         writer: anytype,
         value: anytype,
-    ) (EncodeError || errors.From(@TypeOf(writer)))!void {
+    ) (EncodeError || @TypeOf(writer).Error)!void {
         if (value) |v| {
             return e.encode(writer, v);
         } else |err| {
@@ -125,7 +126,7 @@ pub const Encoder = struct {
         e: Self,
         writer: anytype,
         value: anytype,
-    ) (EncodeError || errors.From(@TypeOf(writer)))!void {
+    ) (EncodeError || @TypeOf(writer).Error)!void {
         const _e = e.withField("");
 
         _ = try writer.write("[");
@@ -142,24 +143,17 @@ pub const Encoder = struct {
         _: Self,
         writer: anytype,
         value: anytype,
-    ) errors.From(@TypeOf(writer))!void {
-        const std_writer = if (comptime funcs.hasFn(@TypeOf(writer), "writeAll"))
-            writer
-        else if (comptime funcs.hasFn(@TypeOf(writer), "stdWriter"))
-            writer.stdWriter()
-        else if (comptime funcs.hasFn(@TypeOf(writer), "writer"))
-            writer.writer().stdWriter()
-        else
-            std.io.GenericWriter(@TypeOf(writer), @TypeOf(writer).Error, @TypeOf(writer).write){ .context = writer };
-
-        try std.fmt.format(std_writer, "{d}", .{value});
+    ) @TypeOf(writer).Error!void {
+        var std_writer = writer.stdWriter(&.{});
+        var w: *std.Io.Writer = &std_writer.interface;
+        w.print("{d}", .{value}) catch return std_writer.err.?;
     }
 
     pub fn encodeOptional(
         e: Self,
         writer: anytype,
         value: anytype,
-    ) (EncodeError || errors.From(@TypeOf(writer)))!void {
+    ) (EncodeError || @TypeOf(writer).Error)!void {
         if (value) |v| {
             try e.encode(writer, v);
         } else {
@@ -171,7 +165,7 @@ pub const Encoder = struct {
         e: Self,
         writer: anytype,
         value: anytype,
-    ) (EncodeError || errors.From(@TypeOf(writer)))!void {
+    ) (EncodeError || @TypeOf(writer).Error)!void {
         if (slices.as(value)) |slc| {
             if (types.Child(@TypeOf(slc)) == u8 and utf8.isValid(slc)) {
                 return e.encodeString(writer, slc);
@@ -195,7 +189,7 @@ pub const Encoder = struct {
         _: Self,
         writer: anytype,
         value: []const u8,
-    ) errors.From(@TypeOf(writer))!void {
+    ) @TypeOf(writer).Error!void {
         _ = try writer.write("\"");
 
         var i: usize = 0;
@@ -221,7 +215,7 @@ pub const Encoder = struct {
         e: Self,
         writer: anytype,
         value: anytype,
-    ) (EncodeError || errors.From(@TypeOf(writer)))!void {
+    ) (EncodeError || @TypeOf(writer).Error)!void {
         const T = @TypeOf(value);
         const ti = @typeInfo(T).@"struct";
 
@@ -237,7 +231,7 @@ pub const Encoder = struct {
                 if (should_space) _ = try writer.write(" ");
                 should_space = true;
 
-                var field_name: [64]u8 = undefined;
+                var field_name: [field_size]u8 = undefined;
 
                 const j = bytes.copyMany(&field_name, &.{
                     e.options.field_name,
@@ -295,7 +289,7 @@ pub const Encoder = struct {
         e: Self,
         writer: anytype,
         value: type,
-    ) errors.From(@TypeOf(writer))!void {
+    ) @TypeOf(writer).Error!void {
         try e.encodeString(writer, @typeName(value));
     }
 
@@ -303,7 +297,7 @@ pub const Encoder = struct {
         e: Self,
         writer: anytype,
         value: anytype,
-    ) (EncodeError || errors.From(@TypeOf(writer)))!void {
+    ) (EncodeError || @TypeOf(writer).Error)!void {
         const T = @TypeOf(value);
         const ti = @typeInfo(T).@"union";
 
@@ -328,7 +322,7 @@ pub const Encoder = struct {
         e: Self,
         writer: anytype,
         value: anytype,
-    ) (EncodeError || errors.From(@TypeOf(writer)))!void {
+    ) (EncodeError || @TypeOf(writer).Error)!void {
         const T = @TypeOf(value);
         const ti = @typeInfo(T).vector;
 
@@ -339,7 +333,7 @@ pub const Encoder = struct {
     pub fn encodeVoid(
         _: Self,
         writer: anytype,
-    ) errors.From(@TypeOf(writer))!void {
+    ) @TypeOf(writer).Error!void {
         _ = try writer.write("null");
     }
 

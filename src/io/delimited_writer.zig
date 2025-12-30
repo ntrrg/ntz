@@ -2,11 +2,11 @@
 // This source code was released under the MIT license.
 
 const std = @import("std");
+const Allocator = std.mem.Allocator;
 
 const io = @import("root.zig");
 const types = @import("../types/root.zig");
 const bytes = types.bytes;
-const errors = types.errors;
 
 /// Creates a writer that actually writes when it finds an arbitrary delimiter.
 ///
@@ -16,9 +16,9 @@ const errors = types.errors;
 /// Use the `.deinit` method to release resources.
 pub fn init(
     writer: anytype,
-    allocator: anytype,
+    allocator: Allocator,
     delimiter: []const u8,
-) DelimitedWriter(@TypeOf(writer), @TypeOf(allocator)) {
+) DelimitedWriter(@TypeOf(writer)) {
     return .{
         .w = writer,
         .buf = bytes.buffer(allocator),
@@ -27,18 +27,14 @@ pub fn init(
 }
 
 /// A writer that actually writes when it finds an arbitrary delimiter.
-pub fn DelimitedWriter(comptime Writer: type, comptime Allocator: type) type {
+pub fn DelimitedWriter(comptime Writer: type) type {
     return struct {
         const Self = @This();
 
-        pub const Error = WriteError || AllocatorError || WriterError;
-        pub const WriterError = errors.From(Writer);
-        pub const AllocatorError = errors.From(Allocator);
-
-        const Buffer = bytes.Buffer(Allocator);
+        pub const Error = Writer.Error || Allocator.Error;
 
         w: Writer,
-        buf: Buffer,
+        buf: bytes.Buffer,
         delim: []const u8,
 
         /// If false, the delimiter will not be written.
@@ -50,14 +46,12 @@ pub fn DelimitedWriter(comptime Writer: type, comptime Allocator: type) type {
 
         /// Writes any buffered bytes to the underlying writer and restores the
         /// buffer to its full capacity.
-        pub fn flush(dw: *Self) WriterError!void {
+        pub fn flush(dw: *Self) Writer.Error!void {
             const data = dw.buf.bytes();
             if (data.len == 0) return;
             _ = try dw.w.write(data);
             dw.buf.clear();
         }
-
-        pub const WriteError = AllocatorError || WriterError;
 
         /// Writes bytes into a buffer until it finds the delimiter.
         ///
@@ -67,7 +61,7 @@ pub fn DelimitedWriter(comptime Writer: type, comptime Allocator: type) type {
         /// Bytes after the delimiter will not be written until another
         /// instance of the delimiter is found, use the `.flush` method for
         /// writing remaining bytes.
-        pub fn write(dw: *Self, data: []const u8) WriteError!usize {
+        pub fn write(dw: *Self, data: []const u8) Error!usize {
             if (data.len == 0) return 0;
             if (dw.delim.len == 1) return dw.scalar(data, dw.delim[0]);
             if (dw.delim.len > 1) return dw.sequence(data);
@@ -76,7 +70,7 @@ pub fn DelimitedWriter(comptime Writer: type, comptime Allocator: type) type {
             return data.len;
         }
 
-        fn scalar(dw: *Self, data: []const u8, delim: u8) WriteError!usize {
+        fn scalar(dw: *Self, data: []const u8, delim: u8) Error!usize {
             var i: usize = 0;
 
             while (bytes.findAt(i, data, delim)) |_j| {
@@ -94,7 +88,7 @@ pub fn DelimitedWriter(comptime Writer: type, comptime Allocator: type) type {
             return data.len;
         }
 
-        fn sequence(dw: *Self, data: []const u8) WriteError!usize {
+        fn sequence(dw: *Self, data: []const u8) Error!usize {
             var i: usize = 0;
 
             // Check if the delimiter is partially stored in the buffer.
@@ -132,7 +126,7 @@ pub fn DelimitedWriter(comptime Writer: type, comptime Allocator: type) type {
             return data.len;
         }
 
-        pub fn writer(dw: *Self) io.Writer(*Self, WriteError, write) {
+        pub fn writer(dw: *Self) io.Writer(*Self, Error, write) {
             return .{ .writer = dw };
         }
 

@@ -1,8 +1,10 @@
 // Copyright 2023 Miguel Angel Rivera Notararigo. All rights reserved.
 // This source code was released under the MIT license.
 
+const std = @import("std");
+const testing = std.testing;
+
 const ntz = @import("ntz");
-const testing = ntz.testing;
 const types = ntz.types;
 const bytes = types.bytes;
 
@@ -20,21 +22,21 @@ test "ntz.encoding.ctxlog.encode" {
     // Booleans.
 
     try e.encode(w, true);
-    try testing.expectEqlStrs(buf.bytes(), "true");
+    try testing.expectEqualStrings("true", buf.bytes());
     buf.clear();
 
     try e.encode(w, false);
-    try testing.expectEqlStrs(buf.bytes(), "false");
+    try testing.expectEqualStrings("false", buf.bytes());
     buf.clear();
 
     // Numbers.
 
     try e.encode(w, 42);
-    try testing.expectEqlStrs(buf.bytes(), "42");
+    try testing.expectEqualStrings("42", buf.bytes());
     buf.clear();
 
     try e.encode(w, 42.42);
-    try testing.expectEqlStrs(buf.bytes(), "42.42");
+    try testing.expectEqualStrings("42.42", buf.bytes());
     buf.clear();
 
     // Enums.
@@ -47,80 +49,90 @@ test "ntz.encoding.ctxlog.encode" {
     };
 
     try e.encode(w, Proficiency.pro);
-    try testing.expectEqlStrs(buf.bytes(), "\"pro\"");
+    try testing.expectEqualStrings("\"pro\"", buf.bytes());
     buf.clear();
 
     try e.encode(w, .other_proficiency);
-    try testing.expectEqlStrs(buf.bytes(), "\"other_proficiency\"");
+    try testing.expectEqualStrings("\"other_proficiency\"", buf.bytes());
     buf.clear();
 
     // Strings, arrays, vectors and pointers.
 
     try e.encode(w, "");
-    try testing.expectEqlStrs(buf.bytes(), "\"\"");
+    try testing.expectEqualStrings("\"\"", buf.bytes());
     buf.clear();
 
     try e.encode(w, "hello, world!");
-    try testing.expectEqlStrs(buf.bytes(), "\"hello, world!\"");
+    try testing.expectEqualStrings("\"hello, world!\"", buf.bytes());
     buf.clear();
 
     try e.encode(w, "\"double quotes\" and 'single quotes'");
-    try testing.expectEqlStrs(buf.bytes(), "\"\\\"double quotes\\\" and 'single quotes'\"");
+    try testing.expectEqualStrings("\"\\\"double quotes\\\" and 'single quotes'\"", buf.bytes());
     buf.clear();
 
     try e.encode(w, "new\nline");
-    try testing.expectEqlStrs(buf.bytes(), "\"new\\nline\"");
+    try testing.expectEqualStrings("\"new\\nline\"", buf.bytes());
     buf.clear();
 
     try e.encode(w, "\"double quotes\"\n'single quotes'");
-    try testing.expectEqlStrs(buf.bytes(), "\"\\\"double quotes\\\"\\n'single quotes'\"");
+    try testing.expectEqualStrings("\"\\\"double quotes\\\"\\n'single quotes'\"", buf.bytes());
     buf.clear();
 
     try e.encode(w, "\xF0\xFF\xFF\xFF");
-    try testing.expectEqlStrs(buf.bytes(), "[240, 255, 255, 255]");
+    try testing.expectEqualStrings("[240, 255, 255, 255]", buf.bytes());
     buf.clear();
 
     try e.encode(w, [_]u8{});
-    try testing.expectEqlStrs(buf.bytes(), "\"\"");
+    try testing.expectEqualStrings("\"\"", buf.bytes());
     buf.clear();
 
     try e.encode(w, [_]u8{ 'a', 'b', 'c' });
-    try testing.expectEqlStrs(buf.bytes(), "\"abc\"");
+    try testing.expectEqualStrings("\"abc\"", buf.bytes());
     buf.clear();
 
     try e.encode(w, [_]u32{ 1, 2, 3 });
-    try testing.expectEqlStrs(buf.bytes(), "[1, 2, 3]");
+    try testing.expectEqualStrings("[1, 2, 3]", buf.bytes());
     buf.clear();
 
     try e.encode(w, @Vector(3, u8){ 'a', 'b', 'c' });
-    try testing.expectEqlStrs(buf.bytes(), "\"abc\"");
+    try testing.expectEqualStrings("\"abc\"", buf.bytes());
     buf.clear();
 
     try e.encode(w, @Vector(3, u32){ 1, 2, 3 });
-    try testing.expectEqlStrs(buf.bytes(), "[1, 2, 3]");
+    try testing.expectEqualStrings("[1, 2, 3]", buf.bytes());
     buf.clear();
 
     const mpz: [*:0]const u8 = "hello, world!";
     try e.encode(w, mpz);
-    try testing.expectEqlStrs(buf.bytes(), "\"hello, world!\"");
+    try testing.expectEqualStrings("\"hello, world!\"", buf.bytes());
     buf.clear();
 
     const mpz32: [*:0]const u32 = &.{ 1, 2, 3, 0 };
     try e.encode(w, mpz32);
-    try testing.expectEqlStrs(buf.bytes(), "[1, 2, 3]");
+    try testing.expectEqualStrings("[1, 2, 3]", buf.bytes());
     buf.clear();
 
     var n: usize = 42;
     try e.encode(w, &n);
-    try testing.expectEqlStrs(buf.bytes(), "42");
+    try testing.expectEqualStrings("42", buf.bytes());
     buf.clear();
 
     const mp: [*]const u8 = "hello, world!";
-    try testing.expectErr(e.encode(w, mp), ctxlog.Encoder.EncodeError.UnboundedPointer);
+
+    try testing.expectError(
+        ctxlog.Encoder.EncodeError.UnboundedPointer,
+        e.encode(w, mp),
+    );
+
     buf.clear();
 
     const cp: [*c]const u8 = "hello, world!";
-    try testing.expectErr(e.encode(w, cp), ctxlog.Encoder.EncodeError.UnboundedPointer);
+
+    try testing.expectError(
+        ctxlog.Encoder.EncodeError.UnboundedPointer,
+        e.encode(w, cp),
+    );
+
     buf.clear();
 
     // Structs.
@@ -161,14 +173,14 @@ test "ntz.encoding.ctxlog.encode" {
     };
 
     try e.encode(w, person);
-    try testing.expectEqlStrs(buf.bytes(), "name=\"Miguel Angel\" height=187 skills=[name=\"Zig\" prof=\"beginner\", name=\"Go\" prof=\"average\", name=\"Breathing\" prof=\"pro\", name=\"Eating\" prof=\"god\"]");
+    try testing.expectEqualStrings("name=\"Miguel Angel\" height=187 skills=[name=\"Zig\" prof=\"beginner\", name=\"Go\" prof=\"average\", name=\"Breathing\" prof=\"pro\", name=\"Eating\" prof=\"god\"]", buf.bytes());
     buf.clear();
 
     e.options.omit_empty = false;
     e.options.omit_null = false;
     person.skills = &.{};
     try e.encode(w, person);
-    try testing.expectEqlStrs(buf.bytes(), "name=\"Miguel Angel\" height=187 skills=[] pet=null");
+    try testing.expectEqualStrings("name=\"Miguel Angel\" height=187 skills=[] pet=null", buf.bytes());
     buf.clear();
     e.options.omit_empty = true;
     e.options.omit_null = true;
@@ -177,18 +189,18 @@ test "ntz.encoding.ctxlog.encode" {
     person.pet = .{ .name = "Draka", .kind = .dog };
 
     try e.encode(w, person);
-    try testing.expectEqlStrs(buf.bytes(), "name=\"Miguel Angel\" height=187 skills=[name=\"Zig\" prof=\"beginner\", name=\"Go\" prof=\"average\", name=\"Breathing\" prof=\"pro\", name=\"Eating\" prof=\"god\"] pet.name=\"Draka\" pet.kind=\"dog\"");
+    try testing.expectEqualStrings("name=\"Miguel Angel\" height=187 skills=[name=\"Zig\" prof=\"beginner\", name=\"Go\" prof=\"average\", name=\"Breathing\" prof=\"pro\", name=\"Eating\" prof=\"god\"] pet.name=\"Draka\" pet.kind=\"dog\"", buf.bytes());
     buf.clear();
 
     person.pet.?.name = "";
     try e.encode(w, person);
-    try testing.expectEqlStrs(buf.bytes(), "name=\"Miguel Angel\" height=187 skills=[name=\"Zig\" prof=\"beginner\", name=\"Go\" prof=\"average\", name=\"Breathing\" prof=\"pro\", name=\"Eating\" prof=\"god\"] pet.kind=\"dog\"");
+    try testing.expectEqualStrings("name=\"Miguel Angel\" height=187 skills=[name=\"Zig\" prof=\"beginner\", name=\"Go\" prof=\"average\", name=\"Breathing\" prof=\"pro\", name=\"Eating\" prof=\"god\"] pet.kind=\"dog\"", buf.bytes());
     buf.clear();
 
     person.pet = null;
     person.skills = &.{};
     try e.encode(w, person);
-    try testing.expectEqlStrs(buf.bytes(), "name=\"Miguel Angel\" height=187");
+    try testing.expectEqualStrings("name=\"Miguel Angel\" height=187", buf.bytes());
     buf.clear();
 
     // Unions.
@@ -206,15 +218,15 @@ test "ntz.encoding.ctxlog.encode" {
     };
 
     try e.encode(w, Vehicle.bike);
-    try testing.expectEqlStrs(buf.bytes(), "\"bike\"");
+    try testing.expectEqualStrings("\"bike\"", buf.bytes());
     buf.clear();
 
     try e.encode(w, Vehicle{ .car = 42 });
-    try testing.expectEqlStrs(buf.bytes(), "42");
+    try testing.expectEqualStrings("42", buf.bytes());
     buf.clear();
 
     try e.encode(w, Vehicle{ .plane = .{ .name = "Some name", .altitude_max = 5000 } });
-    try testing.expectEqlStrs(buf.bytes(), "name=\"Some name\" altitude_max=5000");
+    try testing.expectEqualStrings("name=\"Some name\" altitude_max=5000", buf.bytes());
     buf.clear();
 
     const Driver = struct {
@@ -223,15 +235,15 @@ test "ntz.encoding.ctxlog.encode" {
     };
 
     try e.encode(w, Driver{ .person = person, .vehicle = .bike });
-    try testing.expectEqlStrs(buf.bytes(), "person.name=\"Miguel Angel\" person.height=187 vehicle=\"bike\"");
+    try testing.expectEqualStrings("person.name=\"Miguel Angel\" person.height=187 vehicle=\"bike\"", buf.bytes());
     buf.clear();
 
     try e.encode(w, Driver{ .person = person, .vehicle = .{ .car = 42 } });
-    try testing.expectEqlStrs(buf.bytes(), "person.name=\"Miguel Angel\" person.height=187 vehicle=42");
+    try testing.expectEqualStrings("person.name=\"Miguel Angel\" person.height=187 vehicle=42", buf.bytes());
     buf.clear();
 
     try e.encode(w, Driver{ .person = person, .vehicle = .{ .plane = .{ .name = "Some name", .altitude_max = 5000 } } });
-    try testing.expectEqlStrs(buf.bytes(), "person.name=\"Miguel Angel\" person.height=187 vehicle.name=\"Some name\" vehicle.altitude_max=5000");
+    try testing.expectEqualStrings("person.name=\"Miguel Angel\" person.height=187 vehicle.name=\"Some name\" vehicle.altitude_max=5000", buf.bytes());
     buf.clear();
 
     // Optionals.
@@ -239,13 +251,13 @@ test "ntz.encoding.ctxlog.encode" {
     var optional: ?bool = null;
 
     try e.encode(w, optional);
-    try testing.expectEqlStrs(buf.bytes(), "null");
+    try testing.expectEqualStrings("null", buf.bytes());
     buf.clear();
 
     optional = true;
 
     try e.encode(w, optional);
-    try testing.expectEqlStrs(buf.bytes(), "true");
+    try testing.expectEqualStrings("true", buf.bytes());
     buf.clear();
 
     // Errors.
@@ -255,35 +267,35 @@ test "ntz.encoding.ctxlog.encode" {
     };
 
     try e.encode(w, error.SomeError);
-    try testing.expectEqlStrs(buf.bytes(), "\"SomeError\"");
+    try testing.expectEqualStrings("\"SomeError\"", buf.bytes());
     buf.clear();
 
     try e.encode(w, CtxlogTestingError.SomeError);
-    try testing.expectEqlStrs(buf.bytes(), "\"SomeError\"");
+    try testing.expectEqualStrings("\"SomeError\"", buf.bytes());
     buf.clear();
 
     var may_err: CtxlogTestingError!bool = error.SomeError;
 
     try e.encode(w, may_err);
-    try testing.expectEqlStrs(buf.bytes(), "\"SomeError\"");
+    try testing.expectEqualStrings("\"SomeError\"", buf.bytes());
     buf.clear();
 
     may_err = true;
 
     try e.encode(w, may_err);
-    try testing.expectEqlStrs(buf.bytes(), "true");
+    try testing.expectEqualStrings("true", buf.bytes());
     buf.clear();
 
     // Void.
 
     try e.encode(w, void{});
-    try testing.expectEqlStrs(buf.bytes(), "null");
+    try testing.expectEqualStrings("null", buf.bytes());
     buf.clear();
 
     // Types.
 
     try e.encode(w, bool);
-    try testing.expectEqlStrs(buf.bytes(), "\"bool\"");
+    try testing.expectEqualStrings("\"bool\"", buf.bytes());
     buf.clear();
 
     // Custom encoding.
@@ -310,7 +322,7 @@ test "ntz.encoding.ctxlog.encode" {
     };
 
     try e.encode(w, Point{ .x = 10, .y = 11 });
-    try testing.expectEqlStrs(buf.bytes(), "\"{ x: 10, y: 11 }\"");
+    try testing.expectEqualStrings("\"{ x: 10, y: 11 }\"", buf.bytes());
     buf.clear();
 
     const Line = struct {
@@ -319,6 +331,6 @@ test "ntz.encoding.ctxlog.encode" {
     };
 
     try e.encode(w, Line{ .p1 = .{ .x = 10, .y = 11 }, .p2 = .{ .x = 20, .y = 21 } });
-    try testing.expectEqlStrs(buf.bytes(), "p1=\"{ x: 10, y: 11 }\" p2=\"{ x: 20, y: 21 }\"");
+    try testing.expectEqualStrings("p1=\"{ x: 10, y: 11 }\" p2=\"{ x: 20, y: 21 }\"", buf.bytes());
     buf.clear();
 }

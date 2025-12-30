@@ -5,10 +5,10 @@
 //!
 //! Unicode UTF-8 text encoding.
 
-const bytes = @import("../../types/bytes.zig");
+const types = @import("../../types/root.zig");
+const bytes = types.bytes;
+const iterators = types.iterators;
 const unicode = @import("root.zig");
-
-pub const Error = DecodingError || EncodingError;
 
 const ib_mask: u8 = 0b00_111111;
 const ib_template: u8 = 0b10_000000;
@@ -85,11 +85,9 @@ pub fn encodeLen(cp: unicode.Codepoint) u3 {
 // ///////////
 
 pub const DecodingError =
-    ClearError ||
     DecodeError ||
     DecodeLenError ||
     DecodeLenFBError ||
-    LenError ||
     ValidationError;
 
 pub const ClearError = error{
@@ -104,7 +102,7 @@ pub fn clear(buf: []u8, data: []const u8) ClearError![]u8 {
     var i: usize = 0;
     var j: usize = 0;
 
-    while (nextValidPosFrom(i, data)) |pos| {
+    while (nextValidPositionAt(i, data)) |pos| {
         const l = bytes.copyLtr(buf[j..], data[pos.i..pos.j]);
         j += l;
         i = pos.j;
@@ -123,7 +121,7 @@ pub fn countBytes(data: []const u8) usize {
     var i: usize = 0;
     var n: usize = 0;
 
-    while (nextValidPosFrom(i, data)) |pos| {
+    while (nextValidPositionAt(i, data)) |pos| {
         n += pos.j - pos.i;
         i = pos.j;
     }
@@ -192,7 +190,7 @@ pub fn isValid(data: []const u8) bool {
     return true;
 }
 
-pub const LenError = ValidateError;
+pub const LenError = ValidateAllError;
 
 /// Calculates the number of codepoints stored in `data`. Use `validateAll` for
 /// detailed errors.
@@ -204,13 +202,13 @@ pub const Position = struct { i: usize, j: usize };
 
 /// Obtains the underlying starting and ending indexes of the next valid
 /// codepoint.
-pub fn nextValidPos(data: []const u8) ?Position {
-    return nextValidPosFrom(0, data);
+pub fn nextValidPosition(data: []const u8) ?Position {
+    return nextValidPositionAt(0, data);
 }
 
 /// Obtains the underlying starting and ending indexes of the next valid
 /// codepoint. Starts looking from `idx`.
-pub fn nextValidPosFrom(idx: usize, data: []const u8) ?Position {
+pub fn nextValidPositionAt(idx: usize, data: []const u8) ?Position {
     var i = idx;
 
     while (i < data.len) {
@@ -225,15 +223,15 @@ pub fn nextValidPosFrom(idx: usize, data: []const u8) ?Position {
     return null;
 }
 
-pub const Diagnostic = struct {
+pub const ValidationError = ValidateError || ValidateAllError;
+
+pub const ValidateDiagnostic = struct {
     /// Index where the error occurred.
     index: usize = 0,
 
     /// Expected number of bytes of invalid codepoint.
     expected_len: u3 = 0,
 };
-
-pub const ValidationError = ValidateError || ValidateAllError;
 
 pub const ValidateError = error{
     EmptyInput,
@@ -243,14 +241,15 @@ pub const ValidateError = error{
 
 /// Checks if the given data starts with a UTF-8 encoded codepoint, but doesn't
 /// try to decode it. If valid, returns how many bytes where checked.
-pub fn validate(diagnostic: ?*Diagnostic, data: []const u8) ValidateError!u3 {
+pub fn validate(
+    diagnostic: ?*ValidateDiagnostic,
+    data: []const u8,
+) ValidateError!u3 {
     const l = try decodeLen(data);
     if (l == 0) return error.EmptyInput;
-
     errdefer {
         if (diagnostic) |diag| diag.expected_len = l;
     }
-
     if (data.len < l) return error.IncompleteInput;
 
     for (1..l) |i| {
@@ -268,7 +267,7 @@ pub const ValidateAllError = ValidateError;
 /// Checks if the given data is a UTF-8 encoded string. If valid, returns how
 /// many codepoints where checked.
 pub fn validateAll(
-    diagnostic: ?*Diagnostic,
+    diagnostic: ?*ValidateDiagnostic,
     data: []const u8,
 ) ValidateAllError!usize {
     if (data.len == 0) return 0;
@@ -288,146 +287,107 @@ pub fn validateAll(
     return n;
 }
 
-// ///////////
-// Iterator //
-// ///////////
+// ////////////
+// Iterators //
+// ////////////
 
-///// Iterates over codepoints in UTF-8 encoded strings.
-//pub const Iterator = struct {
-//    const Self = @This();
-//
-//    const Error =
-//        Self.CountError ||
-//        Self.GetError ||
-//        Self.GetBytesError ||
-//        Self.IndexError ||
-//        NextError ||
-//        NextByteError ||
-//        NextBytesError ||
-//        SkipError;
-//
-//    data: []const u8,
-//    i: usize = 0,
-//
-//    pub fn init(data: []const u8) Self {
-//        return .{ .data = data, .i = 0 };
-//    }
-//
-//    pub const CountError = SkipError;
-//
-//    /// Calculates the number of codepoints the iterator holds.
-//    pub fn len(it: Self) Self.CountError!usize {
-//        var it_cp = it;
-//        var n: usize = 0;
-//
-//        while (it_cp.skip()) {
-//            n += 1;
-//        } else |err| {
-//            if (err != error.EndOfIteration) return err;
-//        }
-//
-//        return n;
-//    }
-//
-//    pub const GetError = Self.GetBytesError || DecodeError;
-//
-//    /// Obtains the codepoint at index `idx`. Current iteration index is not
-//    /// modified.
-//    pub fn get(it: Self, idx: usize) Self.GetError!unicode.Codepoint {
-//        const data = try it.getBytes(idx);
-//        var cp = unicode.Codepoint{ .value = 0 };
-//        _ = try decode(&cp, data);
-//        return cp;
-//    }
-//
-//    pub const GetBytesError = Self.IndexError;
-//
-//    /// Obtains the codepoint at index `idx` as bytes. Current iteration index
-//    /// is not modified.
-//    pub fn getBytes(it: Self, idx: usize) Self.GetBytesError![]const u8 {
-//        const pos = try it.index(idx);
-//        return it.data[pos.i..pos.j];
-//    }
-//
-//    pub const IndexError = error{
-//        OutOfBounds,
-//    } || NextIndexError;
-//
-//    pub const IndexResult = struct { i: usize, j: usize };
-//
-//    /// Obtains the underlying starting and ending indexes of the codepoint at
-//    /// index `idx`.
-//    pub fn index(it: Self, idx: usize) Self.IndexError!IndexResult {
-//        if (idx > it.data.len) return error.OutOfBounds;
-//
-//        var it_cp = it;
-//        it_cp.i = 0;
-//        var n: usize = 0;
-//
-//        while (it_cp.nextIndex(null)) |j| {
-//            if (n == idx) return .{ .i = it_cp.i, .j = j };
-//            it_cp.i = j;
-//            n += 1;
-//        } else |err| {
-//            if (err == error.EndOfIteration) return error.OutOfBounds;
-//            return err;
-//        }
-//    }
-//
-//    pub const NextError = NextBytesError || DecodeError;
-//
-//    /// Obtains the next codepoint.
-//    pub fn next(it: *Self) NextError!unicode.Codepoint {
-//        const data = try it.nextBytes();
-//        var cp = unicode.Codepoint{ .value = 0 };
-//        _ = try decode(&cp, data);
-//        return cp;
-//    }
-//
-//    pub const NextByteError = error{
-//        EndOfIteration,
-//    };
-//
-//    /// Obtains the next byte. Use with caution, it may break valid codepoinds.
-//    pub fn nextByte(it: *Self) NextByteError!u8 {
-//        if (it.i >= it.data.len) return error.EndOfIteration;
-//        it.i += 1;
-//        return it.data[it.i - 1];
-//    }
-//
-//    pub const NextBytesError = NextIndexError;
-//
-//    /// Obtains the next codepoint as bytes.
-//    pub fn nextBytes(it: *Self) NextBytesError![]const u8 {
-//        const old_i = it.i;
-//        it.i = try it.nextIndex(null);
-//        return it.data[old_i..it.i];
-//    }
-//
-//    // peekByIndex
-//    // peekToIndex
-//    // peekFromIndex
-//
-//    pub const NextIndexError = error{
-//        EndOfIteration,
-//    } || ValidationError;
-//
-//    /// Obtains the underlying starting index of the next codepoint.
-//    pub fn nextIndex(it: Self, diagnostic: ?*Diagnostic) Self.NextIndexError!usize {
-//        if (it.i >= it.data.len) return error.EndOfIteration;
-//
-//        const l = validate(diagnostic, it.data[it.i..]) catch |err| {
-//            if (diagnostic) |diag| diag.index += it.i;
-//            return err;
-//        };
-//
-//        return it.i + l;
-//    }
-//
-//    pub const SkipError = NextIndexError;
-//
-//    /// Skips the next codepoint.
-//    pub fn skip(it: *Self, diagnostic: ?*Diagnostic) SkipError!void {
-//        it.i = try it.nextIndex(diagnostic);
-//    }
-//};
+pub const IteratorError = error{
+    InvalidPosition,
+} || DecodeLenError || ValidateAllError;
+
+fn iteratorNextIndex(data: []const u8, pos: Position) Position {
+    const last = Position{ .i = data.len, .j = data.len +| 1 };
+    if (pos.i >= data.len or pos.j > data.len) return last;
+    const l = decodeLen(data[pos.j..]) catch return last;
+    return .{ .i = pos.j, .j = pos.j +| l };
+}
+
+fn iteratorWithErrorNextIndex(data: []const u8, pos: Position) IteratorError!Position {
+    if (pos.i > pos.j) return error.InvalidPosition;
+    const last = Position{ .i = data.len, .j = data.len +| 1 };
+    if (pos.i >= data.len or pos.j > data.len) return last;
+    const l = try decodeLen(data[pos.j..]);
+    return .{ .i = pos.j, .j = pos.j +| l };
+}
+
+// Bytes //
+
+pub fn bytesIterator(data: []const u8) IteratorError!iterators.Iterator(
+    []const u8,
+    Position,
+    []const u8,
+    null,
+    iteratorNextIndex,
+    bytesIteratorGetItem,
+) {
+    _ = try validateAll(null, data);
+    const l = try decodeLen(data);
+    return .{ .ctx = data, .index = .{ .i = 0, .j = l } };
+}
+
+fn bytesIteratorGetItem(data: []const u8, pos: Position) ?[]const u8 {
+    if (pos.i >= data.len or pos.j > data.len) return null;
+    return data[pos.i..pos.j];
+}
+
+pub fn bytesIteratorWithError(data: []const u8) IteratorError!iterators.Iterator(
+    []const u8,
+    Position,
+    []const u8,
+    IteratorError,
+    iteratorWithErrorNextIndex,
+    bytesIteratorWithErrorGetItem,
+) {
+    _ = try validateAll(null, data);
+    const l = try decodeLen(data);
+    return .{ .ctx = data, .index = .{ .i = 0, .j = l } };
+}
+
+fn bytesIteratorWithErrorGetItem(data: []const u8, pos: Position) IteratorError!?[]const u8 {
+    if (pos.i > pos.j) return error.InvalidPosition;
+    if (pos.i >= data.len or pos.j > data.len) return null;
+    return data[pos.i..pos.j];
+}
+
+// Codepoint //
+
+pub fn iterator(data: []const u8) IteratorError!iterators.Iterator(
+    []const u8,
+    Position,
+    unicode.Codepoint,
+    null,
+    iteratorNextIndex,
+    iteratorGetItem,
+) {
+    _ = try validateAll(null, data);
+    const l = try decodeLen(data);
+    return .{ .ctx = data, .index = .{ .i = 0, .j = l } };
+}
+
+fn iteratorGetItem(data: []const u8, pos: Position) ?unicode.Codepoint {
+    if (pos.i >= data.len) return null;
+    var cp = unicode.Codepoint{ .value = 0 };
+    _ = decode(&cp, data[pos.i..]) catch unreachable;
+    return cp;
+}
+
+pub fn iteratorWithError(data: []const u8) IteratorError!iterators.Iterator(
+    []const u8,
+    Position,
+    unicode.Codepoint,
+    IteratorError,
+    iteratorWithErrorNextIndex,
+    iteratorWithErrorGetItem,
+) {
+    _ = try validateAll(null, data);
+    const l = try decodeLen(data);
+    return .{ .ctx = data, .index = .{ .i = 0, .j = l } };
+}
+
+fn iteratorWithErrorGetItem(data: []const u8, pos: Position) IteratorError!?unicode.Codepoint {
+    if (pos.i > pos.j) return error.InvalidPosition;
+    if (pos.i >= data.len) return null;
+    var cp = unicode.Codepoint{ .value = 0 };
+    _ = try decode(&cp, data[pos.i..]);
+    return cp;
+}

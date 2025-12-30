@@ -2,8 +2,6 @@
 // This source code was released under the MIT license.
 
 const io = @import("root.zig");
-const types = @import("../types/root.zig");
-const errors = types.errors;
 
 /// Creates a writer that counts how many times it writes and how many bytes it
 /// writes.
@@ -16,8 +14,7 @@ pub fn CountingWriter(comptime Writer: type) type {
     return struct {
         const Self = @This();
 
-        pub const Error = WriterError;
-        pub const WriterError = errors.From(Writer);
+        pub const Error = Writer.Error;
 
         w: Writer,
 
@@ -33,16 +30,16 @@ pub fn CountingWriter(comptime Writer: type) type {
             cw.byte_count = 0;
         }
 
-        /// Counts how many times `.write` is called on the underlying writer
-        /// and how many bytes have been written.
-        pub fn write(cw: *Self, data: []const u8) WriterError!usize {
+        /// Counts how many times `.write` is called and how many bytes have
+        /// been written.
+        pub fn write(cw: *Self, data: []const u8) Error!usize {
             const n = try cw.w.write(data);
             cw.write_count += 1;
             cw.byte_count += n;
-            return n;
+            return data.len;
         }
 
-        pub fn writer(cw: *Self) io.Writer(*Self, WriterError, write) {
+        pub fn writer(cw: *Self) io.Writer(*Self, Error, write) {
             return .{ .writer = cw };
         }
     };
