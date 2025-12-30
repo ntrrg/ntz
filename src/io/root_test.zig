@@ -1,20 +1,22 @@
 // Copyright 2023 Miguel Angel Rivera Notararigo. All rights reserved.
 // This source code was released under the MIT license.
 
-const ntz = @import("ntz");
-const testing = ntz.testing;
-const types = ntz.types;
-const errors = types.errors;
-const bytes = types.bytes;
+const std = @import("std");
+const testing = std.testing;
 
-const io = ntz.io;
+const ntz = @import("ntz");
+const types = ntz.types;
+const bytes = types.bytes;
+const errors = types.errors;
+
+const io_utils = ntz.io;
 
 test "ntz.io" {
     // Readers.
     //_ = @import("counting_reader_test.zig");
 
     // Writers.
-    _ = @import("DynWriter_test.zig");
+    //_ = @import("DynWriter_test.zig");
     _ = @import("writer_test.zig");
     _ = @import("buffered_writer_test.zig");
     _ = @import("counting_writer_test.zig");
@@ -26,20 +28,25 @@ test "ntz.io" {
 // Writers //
 // //////////
 
-fn SingleByteWriter(comptime T: type) type {
+fn SingleByteWriter(comptime T: type, comptime WriteError: type) type {
     return struct {
         const Self = @This();
         pub const Error = WriteError;
 
         writer: T,
 
-        pub const WriteError = errors.From(T);
-
-        pub fn write(sbw: Self, data: []const u8) WriteError!usize {
+        pub fn write(sbw: Self, data: []const u8) Error!usize {
             if (data.len == 0) return 0;
             return sbw.writer.write(data[0..1]);
         }
     };
+}
+
+pub fn singleByteWriter(writer: anytype) SingleByteWriter(
+    @TypeOf(writer),
+    errors.From(@TypeOf(writer)),
+) {
+    return .{ .writer = writer };
 }
 
 test "ntz.io.writeAll" {
@@ -47,14 +54,14 @@ test "ntz.io.writeAll" {
 
     var buf = bytes.buffer(ally);
     defer buf.deinit();
-    var cw = io.countingWriter(&buf);
+    const buf_writer = buf.writer();
+    var cw = io_utils.countingWriter(buf_writer);
 
-    const sbw = SingleByteWriter(*@TypeOf(cw)){ .writer = &cw };
+    const sbw = singleByteWriter(&cw);
 
     const in = "hello, world!";
-    const n = try io.writeAll(sbw, in);
-    try testing.expectEqlStrs(buf.bytes(), in);
-    try testing.expectEql(n, 13);
-    try testing.expectEql(cw.write_count, 13);
-    try testing.expectEql(cw.byte_count, 13);
+    try io_utils.writeAll(sbw, in);
+    try testing.expectEqualStrings(in, buf.bytes());
+    try testing.expectEqual(13, cw.write_count);
+    try testing.expectEqual(13, cw.byte_count);
 }

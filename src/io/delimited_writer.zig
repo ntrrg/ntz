@@ -2,8 +2,9 @@
 // This source code was released under the MIT license.
 
 const std = @import("std");
+const Allocator = std.mem.Allocator;
 
-const io = @import("root.zig");
+const io_utils = @import("root.zig");
 const types = @import("../types/root.zig");
 const bytes = types.bytes;
 const errors = types.errors;
@@ -16,9 +17,12 @@ const errors = types.errors;
 /// Use the `.deinit` method to release resources.
 pub fn init(
     writer: anytype,
-    allocator: anytype,
+    allocator: Allocator,
     delimiter: []const u8,
-) DelimitedWriter(@TypeOf(writer), @TypeOf(allocator)) {
+) DelimitedWriter(
+    @TypeOf(writer),
+    errors.From(@TypeOf(writer)),
+) {
     return .{
         .w = writer,
         .buf = bytes.buffer(allocator),
@@ -27,18 +31,14 @@ pub fn init(
 }
 
 /// A writer that actually writes when it finds an arbitrary delimiter.
-pub fn DelimitedWriter(comptime Writer: type, comptime Allocator: type) type {
+pub fn DelimitedWriter(comptime Writer: type, comptime WriteError: type) type {
     return struct {
         const Self = @This();
 
-        pub const Error = WriteError || AllocatorError || WriterError;
-        pub const WriterError = errors.From(Writer);
-        pub const AllocatorError = errors.From(Allocator);
-
-        const Buffer = bytes.Buffer(Allocator);
+        pub const Error = WriteError || Allocator.Error;
 
         w: Writer,
-        buf: Buffer,
+        buf: bytes.Buffer,
         delim: []const u8,
 
         /// If false, the delimiter will not be written.
@@ -50,14 +50,12 @@ pub fn DelimitedWriter(comptime Writer: type, comptime Allocator: type) type {
 
         /// Writes any buffered bytes to the underlying writer and restores the
         /// buffer to its full capacity.
-        pub fn flush(dw: *Self) WriterError!void {
+        pub fn flush(dw: *Self) WriteError!void {
             const data = dw.buf.bytes();
             if (data.len == 0) return;
-            _ = try dw.w.write(data);
+            try io_utils.writeAll(dw.w, data);
             dw.buf.clear();
         }
-
-        pub const WriteError = AllocatorError || WriterError;
 
         /// Writes bytes into a buffer until it finds the delimiter.
         ///
@@ -67,7 +65,7 @@ pub fn DelimitedWriter(comptime Writer: type, comptime Allocator: type) type {
         /// Bytes after the delimiter will not be written until another
         /// instance of the delimiter is found, use the `.flush` method for
         /// writing remaining bytes.
-        pub fn write(dw: *Self, data: []const u8) WriteError!usize {
+        pub fn write(dw: *Self, data: []const u8) Error!usize {
             if (data.len == 0) return 0;
             if (dw.delim.len == 1) return dw.scalar(data, dw.delim[0]);
             if (dw.delim.len > 1) return dw.sequence(data);
@@ -76,7 +74,7 @@ pub fn DelimitedWriter(comptime Writer: type, comptime Allocator: type) type {
             return data.len;
         }
 
-        fn scalar(dw: *Self, data: []const u8, delim: u8) WriteError!usize {
+        fn scalar(dw: *Self, data: []const u8, delim: u8) Error!usize {
             var i: usize = 0;
 
             while (bytes.findAt(i, data, delim)) |_j| {
@@ -94,7 +92,7 @@ pub fn DelimitedWriter(comptime Writer: type, comptime Allocator: type) type {
             return data.len;
         }
 
-        fn sequence(dw: *Self, data: []const u8) WriteError!usize {
+        fn sequence(dw: *Self, data: []const u8) Error!usize {
             var i: usize = 0;
 
             // Check if the delimiter is partially stored in the buffer.
@@ -132,7 +130,7 @@ pub fn DelimitedWriter(comptime Writer: type, comptime Allocator: type) type {
             return data.len;
         }
 
-        pub fn writer(dw: *Self) io.Writer(*Self, WriteError, write) {
+        pub fn writer(dw: *Self) io_utils.Writer(*Self, Error, write) {
             return .{ .writer = dw };
         }
 
@@ -141,16 +139,16 @@ pub fn DelimitedWriter(comptime Writer: type, comptime Allocator: type) type {
         /// Calculates the number of missing bytes required to possibly build a
         /// delimiter from the buffer.
         fn missingDelimiterBytes(dw: *Self) ?usize {
-            const buf_len = dw.buf.data.len;
-            if (buf_len == 0) return null;
-            const buf_data = dw.buf.bytes();
+            const l = dw.buf.data.len;
+            if (l == 0) return null;
+            const data = dw.buf.bytes();
 
-            var j: usize = @min(dw.delim.len, buf_len);
+            var j: usize = @min(dw.delim.len, l);
 
             while (j > 0) : (j -= 1) {
-                const i = buf_len - j;
+                const i = l - j;
 
-                if (bytes.startsWith(dw.delim, buf_data[i..]))
+                if (bytes.startsWith(dw.delim, data[i..]))
                     return dw.delim.len - j;
             }
 

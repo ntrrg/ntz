@@ -77,14 +77,6 @@ pub fn build(b: *std.Build) void {
         "Enable thread sanitizer",
     );
 
-    // Debugging.
-
-    const debug_valgrind = b.option(
-        bool,
-        "debug-valgrind",
-        "Produce Valgrind friendly binaries",
-    );
-
     // Examples.
 
     const example = b.option(
@@ -94,6 +86,12 @@ pub fn build(b: *std.Build) void {
     ) orelse "";
 
     // Testing.
+
+    const test_build = b.option(
+        bool,
+        "test-build",
+        "Include test executable in regular builds",
+    ) orelse true;
 
     const test_coverage = b.option(
         bool,
@@ -129,7 +127,15 @@ pub fn build(b: *std.Build) void {
         bool,
         "test-slow",
         "Run slow tests",
-    ) orelse false;
+    ) orelse true;
+
+    // Profilling.
+
+    const debug_valgrind = b.option(
+        bool,
+        "debug-valgrind",
+        "Produce Valgrind friendly binaries",
+    );
 
     // ///////////////
     // Dependencies //
@@ -221,10 +227,7 @@ pub fn build(b: *std.Build) void {
 
         const run_step = b.step("run", "Build and run the given example");
         const run = b.addRunArtifact(exe);
-
-        if (b.args) |args| {
-            run.addArgs(args);
-        }
+        if (b.args) |args| run.addArgs(args);
 
         run.step.dependOn(b.getInstallStep());
         run_step.dependOn(&run.step);
@@ -257,13 +260,17 @@ pub fn build(b: *std.Build) void {
     test_mod.addImport("ntz", ntz_mod);
 
     const test_exe = b.addTest(.{
-        //.name = "test",
+        .name = b.fmt("{s}-test", .{name}),
         .root_module = test_mod,
         .filters = if (test_filter) |filter| &.{filter} else &.{},
         .test_runner = null,
         .use_llvm = use_llvm,
         .use_lld = use_llvm,
     });
+
+    if (test_build) {
+        b.installArtifact(test_exe);
+    }
 
     const test_run = b.addRunArtifact(test_exe);
     test_step.dependOn(&test_run.step);
@@ -274,7 +281,8 @@ pub fn build(b: *std.Build) void {
         const coverage_cmd = b.addSystemCommand(&.{test_coverage_cmd});
 
         coverage_cmd.addArgs(&.{
-            "--include-pattern=/src",
+            "--clean",
+            "--include-pattern=ntz/src",
             "--exclude-pattern=_test.zig",
             test_coverage_out,
         });
@@ -282,7 +290,6 @@ pub fn build(b: *std.Build) void {
         coverage_cmd.addArtifactArg(test_exe);
         coverage_cmd.has_side_effects = true;
 
-        test_step.dependOn(&b.addRemoveDirTree(b.path(test_coverage_out)).step);
         test_step.dependOn(&coverage_cmd.step);
     }
 
@@ -307,7 +314,19 @@ pub fn build(b: *std.Build) void {
     ci_step.dependOn(&zig_fmt.step);
     ci_step.dependOn(b.getInstallStep());
     ci_step.dependOn(test_step);
-    //ci_step.dependOn(coverage_step);
+
+    // ////////////////
+    // Documentation //
+    // ////////////////
+
+    const ntz_docs = b.addInstallDirectory(.{
+        .source_dir = ntz_lib.getEmittedDocs(),
+        .install_dir = .prefix,
+        .install_subdir = "docs",
+    });
+
+    const docs_step = b.step("docs", "Generate documentation");
+    docs_step.dependOn(&ntz_docs.step);
 }
 
 const Manifest = struct {

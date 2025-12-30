@@ -7,7 +7,8 @@
 
 const bytes = @import("bytes.zig");
 
-/// Gets internal error set `Error` from the given type.
+/// Gets internal error set `Error` from the given type. `T` may be pointer
+/// `*T`, in which case, its child type will be used.
 pub fn From(comptime T: type) type {
     return FromDecl(T, "Error");
 }

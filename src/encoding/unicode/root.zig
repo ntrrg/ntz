@@ -7,8 +7,6 @@
 
 pub const utf8 = @import("utf8.zig");
 
-pub const Error = Codepoint.Error || utf8.Error;
-
 pub const replacement_cp = Codepoint{ .value = 0xFFFD };
 
 pub const Codepoint = struct {
@@ -18,7 +16,7 @@ pub const Codepoint = struct {
 
     value: u21,
 
-    pub const InitError = ValidateError;
+    pub const InitError = ValidationError;
 
     pub fn init(value: u21) InitError!Self {
         const cp = Self{ .value = value };

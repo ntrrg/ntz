@@ -8,7 +8,7 @@
 
 const std = @import("std");
 
-const io = @import("../io/root.zig");
+const io_utils = @import("../io/root.zig");
 const types = @import("../types/root.zig");
 const bytes = types.bytes;
 
@@ -50,64 +50,82 @@ pub const Level = enum {
     };
 
     pub fn fromKey(key_text: []const u8) FromKeyError!Self {
-        if (bytes.equal(key_text, "DEBUG")) return .debug;
-        if (bytes.equal(key_text, "INFO")) return .info;
-        if (bytes.equal(key_text, "WARN")) return .warn;
-        if (bytes.equal(key_text, "ERROR")) return .@"error";
-        if (bytes.equal(key_text, "FATAL")) return .fatal;
-        if (bytes.equal(key_text, "DISABLED")) return .disabled;
+        if (bytes.equalAny(key_text, &.{ "debug", "DEBUG" })) return .debug;
+        if (bytes.equalAny(key_text, &.{ "info", "INFO" })) return .info;
+        if (bytes.equalAny(key_text, &.{ "warn", "WARN" })) return .warn;
+        if (bytes.equalAny(key_text, &.{ "error", "ERROR" })) return .@"error";
+        if (bytes.equalAny(key_text, &.{ "fatal", "FATAL" })) return .fatal;
+        if (bytes.equalAny(key_text, &.{ "disabled", "DISABLED" })) return .disabled;
         return error.InvalidSeverity;
     }
 };
 
 pub const Logger = @import("logger.zig").Logger;
+pub const logger = @import("logger.zig").init;
 
-/// Creates a simple logger using the standard error as output.
-pub fn init() Logger(std.fs.File.Writer, BasicEncoder, BasicContext, "") {
-    var l = initCustom(
-        io.stdErr().writer(),
-        BasicEncoder{},
-        BasicContext,
-    );
+// /////////////////
+// Default logger //
+// /////////////////
 
-    l.mutex = &io.std_err_mux;
-    return l.withSeverity(.debug);
-}
-
-/// Creates a logger using the given writer as output.
-pub fn initCustom(
-    writer: anytype,
-    encoder: anytype,
-    comptime Context: type,
-) Logger(@TypeOf(writer), @TypeOf(encoder), Context, "") {
+/// Creates a simple logger using stderr as output.
+pub fn init() DefaultLogger {
     return .{
-        .writer = writer,
-        .encoder = encoder,
+        .w = defaultWriter,
+        .e = .{},
     };
 }
 
-// ///////////////
-// Basic logger //
-// ///////////////
+/// Creates a simple logger using the given writer as output.
+pub fn initWith(writer: *std.Io.Writer) DefaultLogger {
+    return .{
+        .w = writer,
+        .e = .{},
+    };
+}
 
-pub const BasicContext = struct {
+pub const DefaultContext = struct {
     level: []const u8,
     msg: []const u8,
     @"error": ?anyerror,
 };
 
-pub const BasicEncoder = struct {
+pub const DefaultEncoder = struct {
     const Self = @This();
 
-    pub fn encode(_: Self, writer: anytype, val: BasicContext) !void {
-        _ = try writer.write("[");
-        _ = try writer.write(val.level);
-        _ = try writer.write("] ");
-        _ = try writer.write(val.msg);
+    pub fn encode(_: Self, writer: *std.Io.Writer, value: DefaultContext) !void {
+        try writer.writeAll("[");
+        try writer.writeAll(value.level);
+        try writer.writeAll("] ");
+        try writer.writeAll(value.msg);
 
-        if (val.@"error") |err| {
-            _ = try writer.write(": ");
-            _ = try writer.write(@errorName(err));
+        if (value.@"error") |err| {
+            try writer.writeAll(": ");
+            try writer.writeAll(@errorName(err));
         }
     }
 };
+
+pub const DefaultLogger = Logger(DefaultEncoder, DefaultContext, "");
+
+pub const DefaultWriter = struct {
+    const Self = @This();
+
+    pub const Error = std.Io.Writer.Error;
+
+    pub fn write(_: Self, data: []const u8) Error!usize {
+        const stderr = std.debug.lockStderr(&.{});
+        defer std.debug.unlockStderr();
+
+        var w = &stderr.file_writer.interface;
+
+        try w.writeAll(data);
+        return data.len;
+    }
+
+    pub fn writer(_: Self) io_utils.Writer(Self, Error, write) {
+        return .{ .writer = .{} };
+    }
+};
+
+var _defaultWriter = (DefaultWriter{}).writer().toStd(&.{});
+pub const defaultWriter = &_defaultWriter.interface;
