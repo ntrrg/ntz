@@ -5,19 +5,21 @@
 //!
 //! Utilities for working with slices of bytes.
 
+const std = @import("std");
+const Allocator = std.mem.Allocator;
+
 const io = @import("../io/root.zig");
 
 const types = @import("root.zig");
-const errors = @import("errors.zig");
 const slices = @import("slices.zig");
 
 /// Creates a new slice that contains all bytes from `these` and adds `that` at
 /// the end of it.
 pub fn append(
-    allocator: anytype,
+    allocator: Allocator,
     these: []const u8,
     that: u8,
-) ![]u8 {
+) Allocator.Error![]u8 {
     return slices.append(u8, allocator, these, that);
 }
 
@@ -25,25 +27,25 @@ pub fn append(
 ///
 /// This is normally done by the compiler, but for functions receiving
 /// `anytype` arguments, it cannot be enforced.
-pub fn as(val: anytype) ?[]const u8 {
-    if (types.Child(@TypeOf(val)) != u8) return null;
-    return slices.as(val);
+pub fn as(value: anytype) ?[]const u8 {
+    if (types.Child(@TypeOf(value)) != u8) return null;
+    return slices.as(value);
 }
 
 /// Creates a new slice that contains all bytes from `these` and `those`.
 pub fn concat(
-    allocator: anytype,
+    allocator: Allocator,
     these: []const u8,
     those: []const u8,
-) ![]u8 {
+) Allocator.Error![]u8 {
     return slices.concat(u8, allocator, these, those);
 }
 
 /// Creates a new slice that contains all bytes from the given slices.
 pub fn concatMany(
-    allocator: anytype,
+    allocator: Allocator,
     these: []const []const u8,
-) ![]u8 {
+) Allocator.Error![]u8 {
     return slices.concatMany(u8, allocator, these);
 }
 
@@ -147,12 +149,14 @@ pub fn findAt(at: usize, these: []const u8, that: u8) ?usize {
     return slices.findAt(u8, at, these, that);
 }
 
+pub const FindAnyResult = slices.FindAnyResult(u8);
+
 /// Finds the first appearance of any byte from `those` in `these`, and returns
 /// its index and the matching byte.
 pub fn findAny(
     these: []const u8,
     those: []const u8,
-) ?slices.FindAnyResult(u8) {
+) ?FindAnyResult {
     return slices.findAny(u8, these, those);
 }
 
@@ -162,7 +166,7 @@ pub fn findAnyAt(
     at: usize,
     these: []const u8,
     those: []const u8,
-) ?slices.FindAnyResult(u8) {
+) ?FindAnyResult {
     return slices.findAnyAt(u8, at, these, those);
 }
 
@@ -175,6 +179,26 @@ pub fn findSeq(these: []const u8, those: []const u8) ?usize {
 /// and returns its index.
 pub fn findSeqAt(at: usize, these: []const u8, those: []const u8) ?usize {
     return slices.findSeqAt(u8, at, these, those);
+}
+
+/// Checks if the given value may be a string.
+pub fn is(value: anytype) bool {
+    if (types.Child(@TypeOf(value)) != u8) return false;
+    return slices.is(value);
+}
+
+/// Creates a mutable copy of the given string literal.
+pub fn mut(comptime lit: []const u8) [lit.len]u8 {
+    var new: [lit.len]u8 = undefined;
+    _ = copy(&new, lit);
+    return new;
+}
+
+/// Creates a mutable copy of the given string literal.
+pub fn mutZ(comptime lit: [:0]const u8) [lit.len:0]u8 {
+    var new: [lit.len:0]u8 = undefined;
+    _ = copy(&new, lit);
+    return new;
 }
 
 /// Splits `these` in 2 at the first appearance of `that`.
@@ -218,19 +242,6 @@ pub fn splitnAt(
     return slices.splitnAt(u8, at, n, out, these, that);
 }
 
-/// Checks if the given value may be a string.
-pub fn is(val: anytype) bool {
-    if (types.Child(@TypeOf(val)) != u8) return false;
-    return slices.is(val);
-}
-
-/// Creates a mutable copy of the given string literal.
-pub fn mut(comptime lit: []const u8) [lit.len]u8 {
-    var new: [lit.len]u8 = undefined;
-    _ = copy(&new, lit);
-    return new;
-}
-
 /// Checks if `these` starts with `prefix`.
 pub fn startsWith(these: []const u8, prefix: []const u8) bool {
     return slices.startsWith(u8, these, prefix);
@@ -241,46 +252,42 @@ pub fn startsWith(these: []const u8, prefix: []const u8) bool {
 // /////////
 
 /// Creates an empty buffer.
-pub fn buffer(allocator: anytype) Buffer(@TypeOf(allocator)) {
+pub fn buffer(allocator: Allocator) Buffer {
     return .{ .ally = allocator, .data = .{} };
 }
 
-pub fn Buffer(comptime Allocator: type) type {
-    return struct {
-        const Self = @This();
+pub const Buffer = struct {
+    const Self = @This();
 
-        pub const Error = errors.From(Allocator);
+    ally: Allocator,
+    data: slices.Slice(u8),
 
-        ally: Allocator,
-        data: slices.Slice(u8),
+    pub fn deinit(buf: *Self) void {
+        buf.data.deinit(buf.ally);
+    }
 
-        pub fn deinit(buf: *Self) void {
-            buf.data.deinit(buf.ally);
-        }
+    /// Returns the active bytes in the buffer.
+    pub fn bytes(buf: Self) []const u8 {
+        return buf.data.items();
+    }
 
-        /// Returns the active bytes in the buffer.
-        pub fn bytes(buf: Self) []const u8 {
-            return buf.data.items();
-        }
+    /// Sets the buffer as empty. This doesn't deallocates memory.
+    pub fn clear(buf: *Self) void {
+        buf.data.clear();
+    }
 
-        /// Sets the buffer as empty. This doesn't deallocates memory.
-        pub fn clear(buf: *Self) void {
-            buf.data.clear();
-        }
+    // Writer //
 
-        // Writer //
+    /// Writes the given data into the underlying array.
+    ///
+    /// This only allocates memory when there is not enough capacity.
+    pub fn write(buf: *Self, data: []const u8) Allocator.Error!usize {
+        try buf.data.appendMany(buf.ally, data);
+        return data.len;
+    }
 
-        /// Writes the given data into the underlying array.
-        ///
-        /// This only allocates memory when there is not enough capacity.
-        pub fn write(buf: *Self, data: []const u8) Error!usize {
-            try buf.data.appendMany(buf.ally, data);
-            return data.len;
-        }
-
-        /// Creates a simplified writer using the buffer as output.
-        pub fn writer(buf: *Self) io.Writer(*Self, Error, write) {
-            return .{ .writer = buf };
-        }
-    };
-}
+    /// Creates a simplified writer using the buffer as output.
+    pub fn writer(buf: *Self) io.Writer(*Self, Allocator.Error, write) {
+        return .{ .writer = buf };
+    }
+};

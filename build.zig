@@ -129,7 +129,7 @@ pub fn build(b: *std.Build) void {
         bool,
         "test-slow",
         "Run slow tests",
-    ) orelse false;
+    ) orelse true;
 
     // ///////////////
     // Dependencies //
@@ -221,10 +221,7 @@ pub fn build(b: *std.Build) void {
 
         const run_step = b.step("run", "Build and run the given example");
         const run = b.addRunArtifact(exe);
-
-        if (b.args) |args| {
-            run.addArgs(args);
-        }
+        if (b.args) |args| run.addArgs(args);
 
         run.step.dependOn(b.getInstallStep());
         run_step.dependOn(&run.step);

@@ -3,10 +3,12 @@
 
 const test_options = @import("test_options");
 
+const std = @import("std");
+const testing = std.testing;
+
 const ntz = @import("ntz");
 const encoding = ntz.encoding;
 const unicode = encoding.unicode;
-const testing = ntz.testing;
 const types = ntz.types;
 const bytes = types.bytes;
 
@@ -17,6 +19,22 @@ const utf8 = unicode.utf8;
 // - ¢ \xC2\xA2 \u{00A2}
 // - € \xE2\x82\xAC \u{20AC}
 // - 💰 \xF0\x9F\x92\xB0 \u{1F4B0}
+
+const all = "$¢€💰";
+const dollar = '$';
+const cent = '¢';
+const euro = '€';
+const bag = '💰';
+
+const dollarStr = "$";
+const centStr = "¢";
+const euroStr = "€";
+const bagStr = "💰";
+
+const dollarCp = unicode.Codepoint{ .value = 0x24 };
+const centCp = unicode.Codepoint{ .value = 0xA2 };
+const euroCp = unicode.Codepoint{ .value = 0x20AC };
+const bagCp = unicode.Codepoint{ .value = 0x1F4B0 };
 
 test "ntz.encoding.unicode.utf8" {}
 
@@ -34,7 +52,7 @@ test "ntz.encoding.unicode.utf8: all codepoints" {
         var got = unicode.Codepoint{ .value = 0 };
         _ = try utf8.decode(&got, buf[0..n]);
 
-        try testing.expectEql(got, want);
+        try testing.expectEqual(want, got);
     }
 }
 
@@ -44,57 +62,32 @@ test "ntz.encoding.unicode.utf8: all codepoints" {
 
 // encode //
 
-test "ntz.encoding.unicode.utf8.encode: one byte" {
-    const in = try unicode.Codepoint.init('$');
-    const want = "$";
-
-    var got: [1]u8 = undefined;
-    const n = try utf8.encode(&got, in);
-
-    try testing.expectEqlStrs(&got, want);
-    try testing.expectEql(n, 1);
-}
-
-test "ntz.encoding.unicode.utf8.encode: two bytes" {
-    const in = try unicode.Codepoint.init('¢');
-    const want = "¢";
-
-    var got: [2]u8 = undefined;
-    const n = try utf8.encode(&got, in);
-
-    try testing.expectEqlStrs(&got, want);
-    try testing.expectEql(n, 2);
-}
-
-test "ntz.encoding.unicode.utf8.encode: three bytes" {
-    const in = try unicode.Codepoint.init('€');
-    const want = "€";
-
-    var got: [3]u8 = undefined;
-    const n = try utf8.encode(&got, in);
-
-    try testing.expectEqlStrs(&got, want);
-    try testing.expectEql(n, 3);
-}
-
-test "ntz.encoding.unicode.utf8.encode: four bytes" {
-    const in = try unicode.Codepoint.init('💰');
-    const want = "💰";
-
+test "ntz.encoding.unicode.utf8.encode" {
     var got: [4]u8 = undefined;
-    const n = try utf8.encode(&got, in);
 
-    try testing.expectEqlStrs(&got, want);
-    try testing.expectEql(n, 4);
+    var n = try utf8.encode(&got, dollarCp);
+    try testing.expectEqualStrings(dollarStr, got[0..n]);
+    try testing.expectEqual(n, 1);
+
+    n = try utf8.encode(&got, centCp);
+    try testing.expectEqualStrings(centStr, got[0..n]);
+    try testing.expectEqual(n, 2);
+
+    n = try utf8.encode(&got, euroCp);
+    try testing.expectEqualStrings(euroStr, got[0..n]);
+    try testing.expectEqual(n, 3);
+
+    n = try utf8.encode(&got, bagCp);
+    try testing.expectEqualStrings(bagStr, got[0..n]);
+    try testing.expectEqual(n, 4);
 }
 
 test "ntz.encoding.unicode.utf8.encode: small buffer" {
-    const in = try unicode.Codepoint.init('$');
     var got: [0]u8 = undefined;
 
-    try testing.expectErr(
-        utf8.encode(&got, in),
+    try testing.expectError(
         utf8.EncodeError.OutOfSpace,
+        utf8.encode(&got, dollarCp),
     );
 }
 
@@ -104,46 +97,42 @@ test "ntz.encoding.unicode.utf8.encodeLen" {
     // One byte.
 
     var in = try unicode.Codepoint.init(0);
-    try testing.expectEql(utf8.encodeLen(in), 1);
+    try testing.expectEqual(1, utf8.encodeLen(in));
 
-    in = try unicode.Codepoint.init('$');
-    try testing.expectEql(utf8.encodeLen(in), 1);
+    try testing.expectEqual(1, utf8.encodeLen(dollarCp));
 
     in = try unicode.Codepoint.init(0b0111_1111);
-    try testing.expectEql(utf8.encodeLen(in), 1);
+    try testing.expectEqual(1, utf8.encodeLen(in));
 
     // Two bytes.
 
     in = try unicode.Codepoint.init(0b1000_0000);
-    try testing.expectEql(utf8.encodeLen(in), 2);
+    try testing.expectEqual(2, utf8.encodeLen(in));
 
-    in = try unicode.Codepoint.init('¢');
-    try testing.expectEql(utf8.encodeLen(in), 2);
+    try testing.expectEqual(2, utf8.encodeLen(centCp));
 
     in = try unicode.Codepoint.init(0b0111_1111_1111);
-    try testing.expectEql(utf8.encodeLen(in), 2);
+    try testing.expectEqual(2, utf8.encodeLen(in));
 
     // Three bytes.
 
     in = try unicode.Codepoint.init(0b1000_0000_0000);
-    try testing.expectEql(utf8.encodeLen(in), 3);
+    try testing.expectEqual(3, utf8.encodeLen(in));
 
-    in = try unicode.Codepoint.init('€');
-    try testing.expectEql(utf8.encodeLen(in), 3);
+    try testing.expectEqual(3, utf8.encodeLen(euroCp));
 
     in = try unicode.Codepoint.init(0b1111_1111_1111_1111);
-    try testing.expectEql(utf8.encodeLen(in), 3);
+    try testing.expectEqual(3, utf8.encodeLen(in));
 
     // Four bytes.
 
     in = try unicode.Codepoint.init(0b0001_0000_0000_0000_0000);
-    try testing.expectEql(utf8.encodeLen(in), 4);
+    try testing.expectEqual(4, utf8.encodeLen(in));
 
-    in = try unicode.Codepoint.init('💰');
-    try testing.expectEql(utf8.encodeLen(in), 4);
+    try testing.expectEqual(4, utf8.encodeLen(bagCp));
 
     in = try unicode.Codepoint.init(0x10FFFF);
-    try testing.expectEql(utf8.encodeLen(in), 4);
+    try testing.expectEqual(4, utf8.encodeLen(in));
 }
 
 // ///////////
@@ -157,14 +146,14 @@ test "ntz.encoding.unicode.utf8.clear" {
     const want = "\x24 \xC2\xA2 \xE2\x82\xAC \xF0\x9F\x92\xB0";
     var buf: [want.len]u8 = undefined;
     const got = try utf8.clear(&buf, in[0..]);
-    try testing.expectEqlStrs(got, want);
+    try testing.expectEqualStrings(want, got);
 
-    try testing.expectEqlStrs(try utf8.clear(buf[0..0], ""), "");
-    try testing.expectEqlStrs(try utf8.clear(buf[0..4], "\xFF"), "");
+    try testing.expectEqualStrings("", try utf8.clear(buf[0..0], ""));
+    try testing.expectEqualStrings("", try utf8.clear(buf[0..4], "\xFF"));
 
-    try testing.expectErr(
-        utf8.clear(buf[0..1], "\xF0\x9F\x92\xB0"),
+    try testing.expectError(
         utf8.ClearError.OutOfSpace,
+        utf8.clear(buf[0..1], "\xF0\x9F\x92\xB0"),
     );
 }
 
@@ -174,130 +163,108 @@ test "ntz.encoding.unicode.utf8.clearIn" {
     var in = bytes.mut("\xF0\x24\x80 \x80\xC2\xA2 \xC2\xE2\x82\xAC\xB0 \xF0\x9F\x92\xB0");
     const want = "\x24 \xC2\xA2 \xE2\x82\xAC \xF0\x9F\x92\xB0";
     const got = utf8.clearIn(in[0..]);
-    try testing.expectEqlStrs(got, want);
+    try testing.expectEqualStrings(want, got);
 }
 
 // countBytes //
 
 test "ntz.encoding.unicode.utf8.countBytes" {
-    try testing.expectEql(utf8.countBytes("\xFF\x24"), 1);
-    try testing.expectEql(utf8.countBytes("\xFF\xC2\xA2"), 2);
-    try testing.expectEql(utf8.countBytes("\xFF\xE2\x82\xAC"), 3);
-    try testing.expectEql(utf8.countBytes("\xFF\xF0\x9F\x92\xB0"), 4);
+    try testing.expectEqual(1, utf8.countBytes("\xFF\x24"));
+    try testing.expectEqual(2, utf8.countBytes("\xFF\xC2\xA2"));
+    try testing.expectEqual(3, utf8.countBytes("\xFF\xE2\x82\xAC"));
+    try testing.expectEqual(4, utf8.countBytes("\xFF\xF0\x9F\x92\xB0"));
 
-    try testing.expectEql(
+    try testing.expectEqual(
         utf8.countBytes("\x24 \xC2\xA2 \xE2\x82\xAC \xF0\x9F\x92\xB0"),
         13,
     );
 
-    try testing.expectEql(utf8.countBytes("\xF0"), 0);
-    try testing.expectEql(utf8.countBytes("\xFF\xFF\xFF\xFF"), 0);
-    try testing.expectEql(utf8.countBytes("\xF0\xFF\xFF\xFF"), 0);
+    try testing.expectEqual(0, utf8.countBytes("\xF0"));
+    try testing.expectEqual(0, utf8.countBytes("\xFF\xFF\xFF\xFF"));
+    try testing.expectEqual(0, utf8.countBytes("\xF0\xFF\xFF\xFF"));
 }
 
 // decode //
 
-test "ntz.encoding.unicode.utf8.decode: one byte" {
-    const in = "$";
-    const want = try unicode.Codepoint.init('$');
-
+test "ntz.encoding.unicode.utf8.decode" {
     var got = unicode.Codepoint{ .value = 0 };
-    const n = try utf8.decode(&got, in);
+    var n = try utf8.decode(&got, dollarStr);
+    try testing.expectEqual(dollarCp, got);
+    try testing.expectEqual(1, n);
 
-    try testing.expectEql(got, want);
-    try testing.expectEql(n, 1);
-}
+    got = unicode.Codepoint{ .value = 0 };
+    n = try utf8.decode(&got, centStr);
+    try testing.expectEqual(centCp, got);
+    try testing.expectEqual(2, n);
 
-test "ntz.encoding.unicode.utf8.decode: two bytes" {
-    const in = "¢";
-    const want = try unicode.Codepoint.init('¢');
+    got = unicode.Codepoint{ .value = 0 };
+    n = try utf8.decode(&got, euroStr);
+    try testing.expectEqual(euroCp, got);
+    try testing.expectEqual(3, n);
 
-    var got = unicode.Codepoint{ .value = 0 };
-    const n = try utf8.decode(&got, in);
-
-    try testing.expectEql(got, want);
-    try testing.expectEql(n, 2);
-}
-
-test "ntz.encoding.unicode.utf8.decode: three bytes" {
-    const in = "€";
-    const want = try unicode.Codepoint.init('€');
-
-    var got = unicode.Codepoint{ .value = 0 };
-    const n = try utf8.decode(&got, in);
-
-    try testing.expectEql(got, want);
-    try testing.expectEql(n, 3);
-}
-
-test "ntz.encoding.unicode.utf8.decode: four bytes" {
-    const in = "💰";
-    const want = try unicode.Codepoint.init('💰');
-
-    var got = unicode.Codepoint{ .value = 0 };
-    const n = try utf8.decode(&got, in);
-
-    try testing.expectEql(got, want);
-    try testing.expectEql(n, 4);
+    got = unicode.Codepoint{ .value = 0 };
+    n = try utf8.decode(&got, bagStr);
+    try testing.expectEqual(bagCp, got);
+    try testing.expectEqual(4, n);
 }
 
 test "ntz.encoding.unicode.utf8.decode: empty" {
     var got = unicode.Codepoint{ .value = 0 };
-    try testing.expectErr(utf8.decode(&got, ""), utf8.DecodeError.EmptyInput);
+    try testing.expectError(utf8.DecodeError.EmptyInput, utf8.decode(&got, ""));
 }
 
 // decodeLen //
 
 test "ntz.encoding.unicode.utf8.decodeLen" {
-    try testing.expectEql(try utf8.decodeLen(""), 0);
-    try testing.expectEql(try utf8.decodeLen("$"), 1);
-    try testing.expectEql(try utf8.decodeLen("¢"), 2);
-    try testing.expectEql(try utf8.decodeLen("€"), 3);
-    try testing.expectEql(try utf8.decodeLen("\u{1F4B0}"), 4);
+    try testing.expectEqual(0, try utf8.decodeLen(""));
+    try testing.expectEqual(1, try utf8.decodeLen(dollarStr));
+    try testing.expectEqual(2, try utf8.decodeLen(centStr));
+    try testing.expectEqual(3, try utf8.decodeLen(euroStr));
+    try testing.expectEqual(4, try utf8.decodeLen(bagStr));
 
-    try testing.expectEql(try utf8.decodeLen("$¢€\u{1F4B0}"), 1);
-    try testing.expectEql(try utf8.decodeLen("¢€\u{1F4B0}$"), 2);
-    try testing.expectEql(try utf8.decodeLen("€\u{1F4B0}$¢"), 3);
-    try testing.expectEql(try utf8.decodeLen("\u{1F4B0}$¢€"), 4);
+    try testing.expectEqual(1, try utf8.decodeLen("$¢€\u{1F4B0}"));
+    try testing.expectEqual(2, try utf8.decodeLen("¢€\u{1F4B0}$"));
+    try testing.expectEqual(3, try utf8.decodeLen("€\u{1F4B0}$¢"));
+    try testing.expectEqual(4, try utf8.decodeLen("\u{1F4B0}$¢€"));
 }
 
 // decodeLenFb //
 
 test "ntz.encoding.unicode.utf8.decodeLenFb" {
-    try testing.expectEql(try utf8.decodeLenFb(0), 1);
-    try testing.expectEql(try utf8.decodeLenFb(0x24), 1);
-    try testing.expectEql(try utf8.decodeLenFb(0b0111_1111), 1);
+    try testing.expectEqual(1, try utf8.decodeLenFb(0));
+    try testing.expectEqual(1, try utf8.decodeLenFb(0x24));
+    try testing.expectEqual(1, try utf8.decodeLenFb(0b0111_1111));
 
-    try testing.expectEql(try utf8.decodeLenFb(0b110_00000), 2);
-    try testing.expectEql(try utf8.decodeLenFb(0xC2), 2);
-    try testing.expectEql(try utf8.decodeLenFb(0b110_11111), 2);
+    try testing.expectEqual(2, try utf8.decodeLenFb(0b110_00000));
+    try testing.expectEqual(2, try utf8.decodeLenFb(0xC2));
+    try testing.expectEqual(2, try utf8.decodeLenFb(0b110_11111));
 
-    try testing.expectEql(try utf8.decodeLenFb(0b1110_0000), 3);
-    try testing.expectEql(try utf8.decodeLenFb(0xE2), 3);
-    try testing.expectEql(try utf8.decodeLenFb(0b1110_1111), 3);
+    try testing.expectEqual(3, try utf8.decodeLenFb(0b1110_0000));
+    try testing.expectEqual(3, try utf8.decodeLenFb(0xE2));
+    try testing.expectEqual(3, try utf8.decodeLenFb(0b1110_1111));
 
-    try testing.expectEql(try utf8.decodeLenFb(0b11110_000), 4);
-    try testing.expectEql(try utf8.decodeLenFb(0xF0), 4);
-    try testing.expectEql(try utf8.decodeLenFb(0b11110_111), 4);
+    try testing.expectEqual(4, try utf8.decodeLenFb(0b11110_000));
+    try testing.expectEqual(4, try utf8.decodeLenFb(0xF0));
+    try testing.expectEqual(4, try utf8.decodeLenFb(0b11110_111));
 
-    try testing.expectErr(
+    try testing.expectError(
+        utf8.DecodeLenFBError.InvalidFirstByte,
         utf8.decodeLenFb(0b111110_11),
-        utf8.DecodeLenFBError.InvalidFirstByte,
     );
 
-    try testing.expectErr(
+    try testing.expectError(
+        utf8.DecodeLenFBError.InvalidFirstByte,
         utf8.decodeLenFb(0b1111110_1),
-        utf8.DecodeLenFBError.InvalidFirstByte,
     );
 
-    try testing.expectErr(
+    try testing.expectError(
+        utf8.DecodeLenFBError.InvalidFirstByte,
         utf8.decodeLenFb(0b1111_1110),
-        utf8.DecodeLenFBError.InvalidFirstByte,
     );
 
-    try testing.expectErr(
-        utf8.decodeLenFb(0b1111_1111),
+    try testing.expectError(
         utf8.DecodeLenFBError.InvalidFirstByte,
+        utf8.decodeLenFb(0b1111_1111),
     );
 }
 
@@ -340,11 +307,11 @@ test "ntz.encoding.unicode.utf8.isIntermediateByte" {
 
 test "ntz.encoding.unicode.utf8.isValid" {
     try testing.expect(utf8.isValid(""));
-    try testing.expect(utf8.isValid("$"));
-    try testing.expect(utf8.isValid("¢"));
-    try testing.expect(utf8.isValid("€"));
-    try testing.expect(utf8.isValid("\u{1F4B0}"));
-    try testing.expect(utf8.isValid("$¢€\u{1F4B0}"));
+    try testing.expect(utf8.isValid(dollarStr));
+    try testing.expect(utf8.isValid(centStr));
+    try testing.expect(utf8.isValid(euroStr));
+    try testing.expect(utf8.isValid(bagStr));
+    try testing.expect(utf8.isValid(all));
     try testing.expect(utf8.isValid("\x24 \xC2\xA2 \xE2\x82\xAC \xF0\x9F\x92\xB0"));
     try testing.expect(!utf8.isValid("\x80\x80\x80\x80\x80"));
 }
@@ -352,446 +319,327 @@ test "ntz.encoding.unicode.utf8.isValid" {
 // len //
 
 test "ntz.encoding.unicode.utf8.len" {
-    try testing.expectEql(try utf8.len(""), 0);
-    try testing.expectEql(try utf8.len("$"), 1);
-    try testing.expectEql(try utf8.len("¢"), 1);
-    try testing.expectEql(try utf8.len("€"), 1);
-    try testing.expectEql(try utf8.len("💰"), 1);
-    try testing.expectEql(try utf8.len("$¢€\u{1F4B0}"), 4);
+    try testing.expectEqual(0, try utf8.len(""));
+    try testing.expectEqual(1, try utf8.len(dollarStr));
+    try testing.expectEqual(1, try utf8.len(centStr));
+    try testing.expectEqual(1, try utf8.len(euroStr));
+    try testing.expectEqual(1, try utf8.len(bagStr));
+    try testing.expectEqual(4, try utf8.len(all));
 
-    try testing.expectEql(try utf8.len("hello, world $!"), 15);
-    try testing.expectEql(try utf8.len("hello, world ¢!"), 15);
-    try testing.expectEql(try utf8.len("hello, world €!"), 15);
-    try testing.expectEql(try utf8.len("hello, world \u{1F4B0}!"), 15);
+    try testing.expectEqual(15, try utf8.len("hello, world $!"));
+    try testing.expectEqual(15, try utf8.len("hello, world ¢!"));
+    try testing.expectEqual(15, try utf8.len("hello, world €!"));
+    try testing.expectEqual(15, try utf8.len("hello, world \u{1F4B0}!"));
 }
 
-// nextValidPos //
-// nextValidPosFrom //
+// nextValidPosition //
+// nextValidPositionAt //
 
-test "ntz.encoding.unicode.utf8.nextValidPos" {
-    try testing.expectEql(utf8.nextValidPos(""), null);
-    try testing.expectEql(utf8.nextValidPos("\x24"), .{ .i = 0, .j = 1 });
-    try testing.expectEql(utf8.nextValidPos("\xC2\xA2"), .{ .i = 0, .j = 2 });
-    try testing.expectEql(utf8.nextValidPos("\xE2\x82\xAC"), .{ .i = 0, .j = 3 });
-    try testing.expectEql(utf8.nextValidPos("\xF0\x9F\x92\xB0"), .{ .i = 0, .j = 4 });
-    try testing.expectEql(utf8.nextValidPos("\x80\x80\x80\x80\x80"), null);
+test "ntz.encoding.unicode.utf8.nextValidPosition" {
+    try testing.expectEqualDeep(null, utf8.nextValidPosition(""));
+
+    try testing.expectEqualDeep(
+        utf8.Position{ .i = 0, .j = 1 },
+        utf8.nextValidPosition(dollarStr),
+    );
+
+    try testing.expectEqualDeep(
+        utf8.Position{ .i = 0, .j = 2 },
+        utf8.nextValidPosition(centStr),
+    );
+
+    try testing.expectEqualDeep(
+        utf8.Position{ .i = 0, .j = 3 },
+        utf8.nextValidPosition(euroStr),
+    );
+
+    try testing.expectEqualDeep(
+        utf8.Position{ .i = 0, .j = 4 },
+        utf8.nextValidPosition(bagStr),
+    );
+
+    try testing.expectEqualDeep(null, utf8.nextValidPosition("\x80\x80\x80\x80\x80"));
 
     const in = "\xF0\x24\x80\x80\xC2\xA2\xC2\xE2\x82\xAC\xB0\xF0\x9F\x92\xB0";
-    try testing.expectEql(utf8.nextValidPos(in), .{ .i = 1, .j = 2 });
-    try testing.expectEql(utf8.nextValidPosFrom(2, in), .{ .i = 4, .j = 6 });
-    try testing.expectEql(utf8.nextValidPosFrom(5, in), .{ .i = 7, .j = 10 });
-    try testing.expectEql(utf8.nextValidPosFrom(8, in), .{ .i = 11, .j = 15 });
-    try testing.expectEql(utf8.nextValidPosFrom(12, in), null);
+
+    try testing.expectEqualDeep(
+        utf8.Position{ .i = 1, .j = 2 },
+        utf8.nextValidPosition(in),
+    );
+
+    try testing.expectEqualDeep(
+        utf8.Position{ .i = 4, .j = 6 },
+        utf8.nextValidPositionAt(2, in),
+    );
+
+    try testing.expectEqualDeep(
+        utf8.Position{ .i = 7, .j = 10 },
+        utf8.nextValidPositionAt(5, in),
+    );
+
+    try testing.expectEqualDeep(
+        utf8.Position{ .i = 11, .j = 15 },
+        utf8.nextValidPositionAt(8, in),
+    );
+
+    try testing.expectEqualDeep(null, utf8.nextValidPositionAt(12, in));
 }
 
 // validate //
 
 test "ntz.encoding.unicode.utf8.validate" {
-    try testing.expectEql(try utf8.validate(null, "\x24"), 1);
-    try testing.expectEql(try utf8.validate(null, "\xC2\xA2"), 2);
-    try testing.expectEql(try utf8.validate(null, "\xE2\x82\xAC"), 3);
-    try testing.expectEql(try utf8.validate(null, "\xF0\x9F\x92\xB0"), 4);
-
-    try testing.expectEql(
-        try utf8.validate(null, "\x24 \xC2\xA2 \xE2\x82\xAC \xF0\x9F\x92\xB0"),
-        1,
-    );
+    try testing.expectEqual(1, try utf8.validate(null, dollarStr));
+    try testing.expectEqual(2, try utf8.validate(null, centStr));
+    try testing.expectEqual(3, try utf8.validate(null, euroStr));
+    try testing.expectEqual(4, try utf8.validate(null, bagStr));
+    try testing.expectEqual(1, try utf8.validate(null, "\x24 \xC2\xA2 \xE2\x82\xAC \xF0\x9F\x92\xB0"));
 }
 
 test "ntz.encoding.unicode.utf8.validate: invalid bytes" {
-    var diag = utf8.Diagnostic{};
+    var diag = utf8.ValidateDiagnostic{};
 
-    try testing.expectErr(
-        utf8.validate(&diag, ""),
+    try testing.expectError(
         utf8.ValidateError.EmptyInput,
+        utf8.validate(&diag, ""),
     );
 
-    try testing.expectEql(diag.index, 0);
-    try testing.expectEql(diag.expected_len, 0);
+    try testing.expectEqual(0, diag.index);
+    try testing.expectEqual(0, diag.expected_len);
 
-    diag = utf8.Diagnostic{};
+    diag = utf8.ValidateDiagnostic{};
 
-    try testing.expectErr(
-        utf8.validate(&diag, "\xFF\x0F\x0F\x0F"),
+    try testing.expectError(
         utf8.ValidateError.InvalidFirstByte,
+        utf8.validate(&diag, "\xFF\x0F\x0F\x0F"),
     );
 
-    try testing.expectEql(diag.index, 0);
-    try testing.expectEql(diag.expected_len, 0);
+    try testing.expectEqual(0, diag.index);
+    try testing.expectEqual(0, diag.expected_len);
 
-    diag = utf8.Diagnostic{};
+    diag = utf8.ValidateDiagnostic{};
 
-    try testing.expectErr(
-        utf8.validate(&diag, "\xF0"),
+    try testing.expectError(
         utf8.ValidateError.IncompleteInput,
+        utf8.validate(&diag, "\xF0"),
     );
 
-    try testing.expectEql(diag.index, 0);
-    try testing.expectEql(diag.expected_len, 4);
+    try testing.expectEqual(0, diag.index);
+    try testing.expectEqual(4, diag.expected_len);
 
-    diag = utf8.Diagnostic{};
+    diag = utf8.ValidateDiagnostic{};
 
-    try testing.expectErr(
+    try testing.expectError(
+        utf8.ValidateError.InvalidIntermediateByte,
         utf8.validate(&diag, "\xF0\x0F\x0F\x0F"),
-        utf8.ValidateError.InvalidIntermediateByte,
     );
 
-    try testing.expectEql(diag.index, 1);
-    try testing.expectEql(diag.expected_len, 4);
+    try testing.expectEqual(1, diag.index);
+    try testing.expectEqual(4, diag.expected_len);
 
-    diag = utf8.Diagnostic{};
+    diag = utf8.ValidateDiagnostic{};
 
-    try testing.expectErr(
+    try testing.expectError(
+        utf8.ValidateError.InvalidIntermediateByte,
         utf8.validate(&diag, "\xF0\x9F\x0F\x0F"),
-        utf8.ValidateError.InvalidIntermediateByte,
     );
 
-    try testing.expectEql(diag.index, 2);
-    try testing.expectEql(diag.expected_len, 4);
+    try testing.expectEqual(2, diag.index);
+    try testing.expectEqual(4, diag.expected_len);
 
-    diag = utf8.Diagnostic{};
+    diag = utf8.ValidateDiagnostic{};
 
-    try testing.expectErr(
+    try testing.expectError(
+        utf8.ValidateError.InvalidIntermediateByte,
         utf8.validate(&diag, "\xF0\x9F\x92\x0F"),
-        utf8.ValidateError.InvalidIntermediateByte,
     );
 
-    try testing.expectEql(diag.index, 3);
-    try testing.expectEql(diag.expected_len, 4);
+    try testing.expectEqual(3, diag.index);
+    try testing.expectEqual(4, diag.expected_len);
 }
 
 // validateAll //
 
 test "ntz.encoding.unicode.utf8.validateAll" {
-    try testing.expectEql(try utf8.validateAll(null, ""), 0);
-    try testing.expectEql(try utf8.validateAll(null, "\x24"), 1);
-    try testing.expectEql(try utf8.validateAll(null, "\xC2\xA2"), 1);
-    try testing.expectEql(try utf8.validateAll(null, "\xE2\x82\xAC"), 1);
-    try testing.expectEql(try utf8.validateAll(null, "\xF0\x9F\x92\xB0"), 1);
-
-    try testing.expectEql(
-        try utf8.validateAll(null, "\x24 \xC2\xA2 \xE2\x82\xAC \xF0\x9F\x92\xB0"),
-        7,
-    );
+    try testing.expectEqual(0, try utf8.validateAll(null, ""));
+    try testing.expectEqual(1, try utf8.validateAll(null, dollarStr));
+    try testing.expectEqual(1, try utf8.validateAll(null, centStr));
+    try testing.expectEqual(1, try utf8.validateAll(null, euroStr));
+    try testing.expectEqual(1, try utf8.validateAll(null, bagStr));
+    try testing.expectEqual(7, try utf8.validateAll(null, "\x24 \xC2\xA2 \xE2\x82\xAC \xF0\x9F\x92\xB0"));
 }
 
 test "ntz.encoding.unicode.utf8.validateAll: invalid bytes" {
-    var diag = utf8.Diagnostic{};
+    var diag = utf8.ValidateDiagnostic{};
 
-    try testing.expectErr(
-        utf8.validateAll(&diag, " \xFF\x0F\x0F\x0F"),
+    try testing.expectError(
         utf8.ValidateAllError.InvalidFirstByte,
+        utf8.validateAll(&diag, " \xFF\x0F\x0F\x0F"),
     );
 
-    try testing.expectEql(diag.index, 1);
-    try testing.expectEql(diag.expected_len, 0);
+    try testing.expectEqual(1, diag.index);
+    try testing.expectEqual(0, diag.expected_len);
 
-    diag = utf8.Diagnostic{};
+    diag = utf8.ValidateDiagnostic{};
 
-    try testing.expectErr(
-        utf8.validateAll(&diag, " \xF0"),
+    try testing.expectError(
         utf8.ValidateAllError.IncompleteInput,
+        utf8.validateAll(&diag, " \xF0"),
     );
 
-    try testing.expectEql(diag.index, 1);
-    try testing.expectEql(diag.expected_len, 4);
+    try testing.expectEqual(1, diag.index);
+    try testing.expectEqual(4, diag.expected_len);
 
-    diag = utf8.Diagnostic{};
+    diag = utf8.ValidateDiagnostic{};
 
-    try testing.expectErr(
+    try testing.expectError(
+        utf8.ValidateAllError.InvalidIntermediateByte,
         utf8.validateAll(&diag, " \xF0\x0F\x0F\x0F"),
-        utf8.ValidateAllError.InvalidIntermediateByte,
     );
 
-    try testing.expectEql(diag.index, 2);
-    try testing.expectEql(diag.expected_len, 4);
+    try testing.expectEqual(2, diag.index);
+    try testing.expectEqual(4, diag.expected_len);
 
-    diag = utf8.Diagnostic{};
+    diag = utf8.ValidateDiagnostic{};
 
-    try testing.expectErr(
+    try testing.expectError(
+        utf8.ValidateAllError.InvalidIntermediateByte,
         utf8.validateAll(&diag, " \xF0\x9F\x0F\x0F"),
-        utf8.ValidateAllError.InvalidIntermediateByte,
     );
 
-    try testing.expectEql(diag.index, 3);
-    try testing.expectEql(diag.expected_len, 4);
+    try testing.expectEqual(3, diag.index);
+    try testing.expectEqual(4, diag.expected_len);
 
-    diag = utf8.Diagnostic{};
+    diag = utf8.ValidateDiagnostic{};
 
-    try testing.expectErr(
+    try testing.expectError(
+        utf8.ValidateAllError.InvalidIntermediateByte,
         utf8.validateAll(&diag, " \xF0\x9F\x92\x0F"),
-        utf8.ValidateAllError.InvalidIntermediateByte,
     );
 
-    try testing.expectEql(diag.index, 4);
-    try testing.expectEql(diag.expected_len, 4);
+    try testing.expectEqual(4, diag.index);
+    try testing.expectEqual(4, diag.expected_len);
 }
 
-// ///////////
-// Iterator //
-// ///////////
+// ////////////
+// Iterators //
+// ////////////
 
-//test "ntz.encoding.unicode.utf8.Iterator.get" {
-//    var it = utf8.Iterator.init("$¢€💰");
-//
-//    try testing.expectEql(try it.get(3), try unicode.Codepoint.init('💰'));
-//    try testing.expectEql(try it.get(2), try unicode.Codepoint.init('€'));
-//    try testing.expectEql(try it.get(1), try unicode.Codepoint.init('¢'));
-//    try testing.expectEql(try it.get(0), try unicode.Codepoint.init('$'));
-//
-//    try testing.expectEql(
-//        try utf8.get("$\xFF", 0),
-//        try unicode.Codepoint.init('$'),
-//    );
-//
-//    try testing.expectErr(
-//        utf8.get("$\xFF", 1),
-//        utf8.Iterator.GetError.InvalidFirstByte,
-//    );
-//
-//    try testing.expectEql(
-//        try utf8.get("$\xF0", 0),
-//        try unicode.Codepoint.init('$'),
-//    );
-//
-//    try testing.expectErr(
-//        utf8.get("$\xF0", 1),
-//        utf8.Iterator.GetError.IncompleteInput,
-//    );
-//}
-//
-//test "ntz.encoding.unicode.utf8.Iterator.getBytes" {
-//    var it = utf8.Iterator.init("$¢€💰");
-//
-//    try testing.expectEqlStrs(try it.getBytes(3), "💰");
-//    try testing.expectEqlStrs(try it.getBytes(2), "€");
-//    try testing.expectEqlStrs(try it.getBytes(1), "¢");
-//    try testing.expectEqlStrs(try it.getBytes(0), "$");
-//    try testing.expectEqlStrs(try it.nextBytes(), "$");
-//
-//    try testing.expectEqlStrs(try utf8.getBytes("$\xFF", 0), "$");
-//
-//    try testing.expectErr(
-//        utf8.getBytes("$\xFF", 1),
-//        utf8.Iterator.GetBytesError.InvalidFirstByte,
-//    );
-//
-//    try testing.expectEqlStrs(try utf8.getBytes("$\xF0", 0), "$");
-//
-//    try testing.expectErr(
-//        utf8.getBytes("$\xF0", 1),
-//        utf8.Iterator.GetBytesError.IncompleteInput,
-//    );
-//}
-//
-//test "ntz.encoding.unicode.utf8.Iterator.index" {
-//    var it = utf8.Iterator.init("$¢€💰");
-//
-//    try testing.expectEql(try it.index(0), .{ .i = 0, .j = 1 });
-//    try testing.expectEql(try it.index(1), .{ .i = 1, .j = 3 });
-//    try testing.expectEql(try it.index(2), .{ .i = 3, .j = 6 });
-//    try testing.expectEql(try it.index(3), .{ .i = 6, .j = 10 });
-//
-//    try testing.expectEql(try utf8.index("$\xFF", 0), .{ .i = 0, .j = 1 });
-//
-//    try testing.expectErr(
-//        utf8.index("$\xFF", 1),
-//        utf8.Iterator.IndexError.InvalidFirstByte,
-//    );
-//
-//    try testing.expectEql(try utf8.index("$\xF0", 0), .{ .i = 0, .j = 1 });
-//
-//    try testing.expectErr(
-//        utf8.index("$\xF0", 1),
-//        utf8.Iterator.IndexError.IncompleteInput,
-//    );
-//
-//    try testing.expectErr(
-//        utf8.index("", 0),
-//        utf8.Iterator.IndexError.OutOfBounds,
-//    );
-//}
-//
-//test "ntz.encoding.unicode.utf8.Iterator.next" {
-//    var it = utf8.Iterator.init("$¢€💰");
-//
-//    try testing.expectEql(try it.next(), try unicode.Codepoint.init('$'));
-//    try testing.expectEql(try it.next(), try unicode.Codepoint.init('¢'));
-//    try testing.expectEql(try it.next(), try unicode.Codepoint.init('€'));
-//    try testing.expectEql(try it.next(), try unicode.Codepoint.init('💰'));
-//
-//    try testing.expectErr(
-//        it.next(),
-//        utf8.Iterator.NextError.EndOfIteration,
-//    );
-//
-//    try testing.expectErr(
-//        @constCast(&utf8.Iterator.init("\xFF")).next(),
-//        utf8.Iterator.NextBytesError.InvalidFirstByte,
-//    );
-//
-//    try testing.expectErr(
-//        @constCast(&utf8.Iterator.init("\xF0")).next(),
-//        utf8.Iterator.NextBytesError.IncompleteInput,
-//    );
-//}
-//
-//test "ntz.encoding.unicode.utf8.Iterator.nextByte" {
-//    var it = utf8.Iterator.init("$¢€💰");
-//
-//    try testing.expectEql(try it.nextByte(), '$');
-//
-//    try testing.expectEqlStrs(&.{
-//        try it.nextByte(),
-//        try it.nextByte(),
-//    }, "¢");
-//
-//    try testing.expectEqlStrs(&.{
-//        try it.nextByte(),
-//        try it.nextByte(),
-//        try it.nextByte(),
-//    }, "€");
-//
-//    try testing.expectEqlStrs(&.{
-//        try it.nextByte(),
-//        try it.nextByte(),
-//        try it.nextByte(),
-//        try it.nextByte(),
-//    }, "💰");
-//
-//    try testing.expectErr(
-//        it.nextByte(),
-//        utf8.Iterator.NextBytesError.EndOfIteration,
-//    );
-//}
-//
-//test "ntz.encoding.unicode.utf8.Iterator.nextBytes" {
-//    var it = utf8.Iterator.init("$¢€💰");
-//
-//    try testing.expectEqlStrs(try it.nextBytes(), "$");
-//    try testing.expectEqlStrs(try it.nextBytes(), "¢");
-//    try testing.expectEqlStrs(try it.nextBytes(), "€");
-//    try testing.expectEqlStrs(try it.nextBytes(), "💰");
-//
-//    try testing.expectErr(
-//        it.nextBytes(),
-//        utf8.Iterator.NextBytesError.EndOfIteration,
-//    );
-//
-//    try testing.expectErr(
-//        @constCast(&utf8.Iterator.init("\xFF")).nextBytes(),
-//        utf8.Iterator.NextBytesError.InvalidFirstByte,
-//    );
-//
-//    try testing.expectErr(
-//        @constCast(&utf8.Iterator.init("\xF0")).nextBytes(),
-//        utf8.Iterator.NextBytesError.IncompleteInput,
-//    );
-//}
-//
-//test "ntz.encoding.unicode.utf8.Iterator.nextIndex" {
-//    var it = utf8.Iterator.init("$¢€💰");
-//
-//    var got = try it.nextIndex(null);
-//    try testing.expectEql(got, 1);
-//    it.i = got;
-//
-//    got = try it.nextIndex(null);
-//    try testing.expectEql(got, 3);
-//    it.i = got;
-//
-//    got = try it.nextIndex(null);
-//    try testing.expectEql(got, 6);
-//    it.i = got;
-//
-//    got = try it.nextIndex(null);
-//    try testing.expectEql(got, 10);
-//    it.i = got;
-//
-//    try testing.expectErr(
-//        it.nextIndex(null),
-//        utf8.Iterator.NextIndexError.EndOfIteration,
-//    );
-//
-//    try testing.expectErr(
-//        @constCast(&utf8.Iterator.init("")).nextIndex(null),
-//        utf8.Iterator.NextIndexError.EndOfIteration,
-//    );
-//}
-//
-//test "ntz.encoding.unicode.utf8.Iterator.nextIndex: invalid" {
-//    // Incomplete input.
-//
-//    try testing.expectErr(
-//        @constCast(&utf8.Iterator.init("\xF0")).nextIndex(null),
-//        utf8.Iterator.NextIndexError.IncompleteInput,
-//    );
-//
-//    // Codepoint first byte.
-//
-//    var it = utf8.Iterator.init("$\xFF");
-//    it.i = try it.nextIndex(null);
-//    try testing.expectEql(it.i, 1);
-//
-//    var diag = utf8.Diagnostic{};
-//
-//    try testing.expectErr(
-//        it.nextIndex(&diag),
-//        utf8.Iterator.NextIndexError.InvalidFirstByte,
-//    );
-//
-//    try testing.expectEql(diag.index, 1);
-//    try testing.expectEql(diag.expected_len, 0);
-//
-//    // Codepoint intermediate byte.
-//
-//    it = utf8.Iterator.init("$\xF0\x9F\x92\xFF@\xE2\xFF\xAC");
-//    it.i = try it.nextIndex(null);
-//    try testing.expectEql(it.i, 1);
-//
-//    diag = utf8.Diagnostic{};
-//
-//    try testing.expectErr(
-//        it.nextIndex(&diag),
-//        utf8.Iterator.NextIndexError.InvalidIntermediateByte,
-//    );
-//
-//    try testing.expectEql(diag.index, 4);
-//    try testing.expectEql(diag.expected_len, 4);
-//
-//    it.i = 6;
-//
-//    diag = utf8.Diagnostic{};
-//
-//    try testing.expectErr(
-//        it.nextIndex(&diag),
-//        utf8.Iterator.NextIndexError.InvalidIntermediateByte,
-//    );
-//
-//    try testing.expectEql(diag.index, 7);
-//    try testing.expectEql(diag.expected_len, 3);
-//}
-//
-//test "ntz.encoding.unicode.utf8.Iterator.skip" {
-//    var it = utf8.Iterator.init("$¢€💰");
-//
-//    try it.skip();
-//    try testing.expectEqlStrs(try it.nextBytes(), "¢");
-//    try it.skip();
-//    try testing.expectEqlStrs(try it.nextBytes(), "💰");
-//
-//    try testing.expectErr(
-//        it.skip(),
-//        utf8.Iterator.SkipError.EndOfIteration,
-//    );
-//
-//    try testing.expectErr(
-//        @constCast(&utf8.Iterator.init("\xFF")).skip(),
-//        utf8.Iterator.SkipError.InvalidFirstByte,
-//    );
-//
-//    try testing.expectErr(
-//        @constCast(&utf8.Iterator.init("\xF0")).skip(),
-//        utf8.Iterator.SkipError.IncompleteInput,
-//    );
-//}
+test "ntz.encoding.unicode.utf8.bytesIterator" {
+    var it = try utf8.bytesIterator(all);
+
+    try testing.expectEqualDeep(dollarStr, it.peek());
+    try testing.expectEqualDeep(dollarStr, it.next());
+    try testing.expectEqualDeep(centStr, it.peek());
+    try testing.expectEqualDeep(euroStr, it.peekN(2));
+    try testing.expectEqualDeep(bagStr, it.peekN(3));
+    it.skip();
+    try testing.expectEqualDeep(euroStr, it.peek());
+    try testing.expectEqualDeep(bagStr, it.peekN(2));
+    try testing.expectEqualDeep(null, it.peekN(3));
+    it.skipN(10);
+    try testing.expectEqualDeep(null, it.next());
+    try testing.expectEqualDeep(null, it.peek());
+    try testing.expectEqualDeep(null, it.peekN(2));
+    try testing.expectEqualDeep(null, it.peekN(3));
+
+    it.index = .{ .i = 0, .j = 1 };
+    try testing.expectEqualDeep(bagStr, it.peekN(4));
+    it.skipN(4);
+    try testing.expectEqualDeep(null, it.peek());
+    try testing.expectEqualDeep(null, it.next());
+
+    try testing.expectEqualDeep(dollarStr, it.get(.{ .i = 0, .j = 1 }));
+    try testing.expectEqualDeep(centStr, it.get(.{ .i = 1, .j = 3 }));
+    try testing.expectEqualDeep(euroStr, it.get(.{ .i = 3, .j = 6 }));
+    try testing.expectEqualDeep(bagStr, it.get(.{ .i = 6, .j = 10 }));
+}
+
+test "ntz.encoding.unicode.utf8.bytesIteratorWithError" {
+    var it = try utf8.bytesIteratorWithError(all);
+
+    try testing.expectEqualDeep(dollarStr, try it.peek());
+    try testing.expectEqualDeep(dollarStr, try it.next());
+    try testing.expectEqualDeep(centStr, try it.peek());
+    try testing.expectEqualDeep(euroStr, try it.peekN(2));
+    try testing.expectEqualDeep(bagStr, try it.peekN(3));
+    try it.skip();
+    try testing.expectEqualDeep(euroStr, try it.peek());
+    try testing.expectEqualDeep(bagStr, try it.peekN(2));
+    try testing.expectEqualDeep(null, try it.peekN(3));
+    try it.skipN(10);
+    try testing.expectEqualDeep(null, try it.next());
+    try testing.expectEqualDeep(null, try it.peek());
+    try testing.expectEqualDeep(null, try it.peekN(2));
+    try testing.expectEqualDeep(null, try it.peekN(3));
+
+    it.index = .{ .i = 0, .j = 1 };
+    try testing.expectEqualDeep(bagStr, try it.peekN(4));
+    try it.skipN(4);
+    try testing.expectEqualDeep(null, try it.peek());
+    try testing.expectEqualDeep(null, try it.next());
+
+    try testing.expectEqualDeep(dollarStr, try it.get(.{ .i = 0, .j = 1 }));
+    try testing.expectEqualDeep(centStr, try it.get(.{ .i = 1, .j = 3 }));
+    try testing.expectEqualDeep(euroStr, try it.get(.{ .i = 3, .j = 6 }));
+    try testing.expectEqualDeep(bagStr, try it.get(.{ .i = 6, .j = 10 }));
+}
+
+test "ntz.encoding.unicode.utf8.iterator" {
+    var it = try utf8.iterator(all);
+
+    try testing.expectEqualDeep(dollarCp, it.peek());
+    try testing.expectEqualDeep(dollarCp, it.next());
+    try testing.expectEqualDeep(centCp, it.peek());
+    try testing.expectEqualDeep(euroCp, it.peekN(2));
+    try testing.expectEqualDeep(bagCp, it.peekN(3));
+    it.skip();
+    try testing.expectEqualDeep(euroCp, it.peek());
+    try testing.expectEqualDeep(bagCp, it.peekN(2));
+    try testing.expectEqualDeep(null, it.peekN(3));
+    it.skipN(10);
+    try testing.expectEqualDeep(null, it.next());
+    try testing.expectEqualDeep(null, it.peek());
+    try testing.expectEqualDeep(null, it.peekN(2));
+    try testing.expectEqualDeep(null, it.peekN(3));
+
+    it.index = .{ .i = 0, .j = 1 };
+    try testing.expectEqualDeep(bagCp, it.peekN(4));
+    it.skipN(4);
+    try testing.expectEqualDeep(null, it.peek());
+    try testing.expectEqualDeep(null, it.next());
+
+    try testing.expectEqualDeep(dollarCp, it.get(.{ .i = 0, .j = 1 }));
+    try testing.expectEqualDeep(centCp, it.get(.{ .i = 1, .j = 3 }));
+    try testing.expectEqualDeep(euroCp, it.get(.{ .i = 3, .j = 6 }));
+    try testing.expectEqualDeep(bagCp, it.get(.{ .i = 6, .j = 10 }));
+}
+
+test "ntz.encoding.unicode.utf8.iteratorWithError" {
+    var it = try utf8.iteratorWithError(all);
+
+    try testing.expectEqualDeep(dollarCp, try it.peek());
+    try testing.expectEqualDeep(dollarCp, try it.next());
+    try testing.expectEqualDeep(centCp, try it.peek());
+    try testing.expectEqualDeep(euroCp, try it.peekN(2));
+    try testing.expectEqualDeep(bagCp, try it.peekN(3));
+    try it.skip();
+    try testing.expectEqualDeep(euroCp, try it.peek());
+    try testing.expectEqualDeep(bagCp, try it.peekN(2));
+    try testing.expectEqualDeep(null, try it.peekN(3));
+    try it.skipN(10);
+    try testing.expectEqualDeep(null, try it.next());
+    try testing.expectEqualDeep(null, try it.peek());
+    try testing.expectEqualDeep(null, try it.peekN(2));
+    try testing.expectEqualDeep(null, try it.peekN(3));
+
+    it.index = .{ .i = 0, .j = 1 };
+    try testing.expectEqualDeep(bagCp, try it.peekN(4));
+    try it.skipN(4);
+    try testing.expectEqualDeep(null, try it.peek());
+    try testing.expectEqualDeep(null, try it.next());
+
+    try testing.expectEqualDeep(dollarCp, try it.get(.{ .i = 0, .j = 1 }));
+    try testing.expectEqualDeep(centCp, try it.get(.{ .i = 1, .j = 3 }));
+    try testing.expectEqualDeep(euroCp, try it.get(.{ .i = 3, .j = 6 }));
+    try testing.expectEqualDeep(bagCp, try it.get(.{ .i = 6, .j = 10 }));
+}

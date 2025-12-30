@@ -1,26 +1,27 @@
 // Copyright 2023 Miguel Angel Rivera Notararigo. All rights reserved.
 // This source code was released under the MIT license.
 
-const ntz = @import("ntz");
-const testing = ntz.testing;
+const std = @import("std");
+const testing = std.testing;
 
+const ntz = @import("ntz");
 const enums = ntz.types.enums;
 
 test "ntz.types.enums" {}
 
 test "ntz.types.enums.min" {
-    try testing.expectEql(enums.min(Abc), .a);
-    try testing.expectEql(enums.min(Single), .a);
+    try testing.expectEqual(Abc.a, enums.min(Abc));
+    try testing.expectEqual(Single.a, enums.min(Single));
 }
 
 test "ntz.types.enums.at" {
-    try testing.expectEql(enums.at(Abc, 3), .d);
-    try testing.expectEql(enums.at(Single, 0), .a);
+    try testing.expectEqual(Abc.d, enums.at(Abc, 3));
+    try testing.expectEqual(Single.a, enums.at(Single, 0));
 }
 
 test "ntz.types.enums.max" {
-    try testing.expectEql(enums.max(Abc), .f);
-    try testing.expectEql(enums.max(Single), .a);
+    try testing.expectEqual(Abc.f, enums.max(Abc));
+    try testing.expectEqual(Single.a, enums.max(Single));
 }
 
 const Abc = enum {

@@ -2,10 +2,9 @@
 // This source code was released under the MIT license.
 
 const std = @import("std");
+const testing = std.testing;
 
 const ntz = @import("ntz");
-const testing = ntz.testing;
-
 const types = ntz.types;
 
 test "ntz.types" {
@@ -13,6 +12,7 @@ test "ntz.types" {
     _ = @import("enums_test.zig");
     _ = @import("errors_test.zig");
     _ = @import("funcs_test.zig");
+    _ = @import("iterators_test.zig");
     _ = @import("slices_test.zig");
     //_ = @import("strings_test.zig");
     _ = @import("structs_test.zig");
@@ -64,28 +64,39 @@ const Figure = union(enum) {
 // Child //
 
 test "ntz.types.Child" {
-    try testing.expectEql(types.Child([]u8), u8);
-    try testing.expectEql(types.Child([0]u8), u8);
-    try testing.expectEql(types.Child(*u8), u8);
-    try testing.expectEql(types.Child(*[0]u8), u8);
-    try testing.expectEql(types.Child(@Vector(0, u8)), u8);
-    try testing.expectEql(types.Child(*@Vector(0, u8)), @Vector(0, u8));
-    try testing.expectEql(types.Child([*]u8), u8);
-    try testing.expectEql(types.Child([*:0]u8), u8);
-    try testing.expectEql(types.Child([*c]c_char), c_char);
-    try testing.expectEql(types.Child(?u8), u8);
+    try testing.expectEqual(u8, types.Child([]u8));
+    try testing.expectEqual(u8, types.Child([0]u8));
+    try testing.expectEqual(u8, types.Child(*u8));
+    try testing.expectEqual(u8, types.Child(*[0]u8));
+    try testing.expectEqual(u8, types.Child(@Vector(0, u8)));
+    try testing.expectEqual(@Vector(0, u8), types.Child(*@Vector(0, u8)));
+    try testing.expectEqual(u8, types.Child([*]u8));
+    try testing.expectEqual(u8, types.Child([*:0]u8));
+    try testing.expectEqual(c_char, types.Child([*c]c_char));
+    try testing.expectEqual(u8, types.Child(?u8));
 }
 
 // Field //
 
 test "ntz.types.Field" {
-    try testing.expectEql(types.Field(Triangle, "a"), Line);
-    try testing.expectEql(types.Field(Triangle, "b.a"), Point);
-    try testing.expectEql(types.Field(Rectangle, "c.b.x"), usize);
-    try testing.expectEql(types.Field(Figure, "rectangle.d.b.y"), usize);
-    try testing.expectEql(types.Field(MaybeLine, "a"), ?Point);
-    try testing.expectEql(types.Field(MaybeTriangle, "a"), ?MaybeLine);
-    try testing.expectEql(types.Field(MaybeTriangle, "a.b"), ?Point);
+    try testing.expectEqual(Line, types.Field(Triangle, "a"));
+    try testing.expectEqual(Point, types.Field(Triangle, "b.a"));
+    try testing.expectEqual(usize, types.Field(Rectangle, "c.b.x"));
+    try testing.expectEqual(usize, types.Field(Figure, "rectangle.d.b.y"));
+    try testing.expectEqual(?Point, types.Field(MaybeLine, "a"));
+    try testing.expectEqual(?MaybeLine, types.Field(MaybeTriangle, "a"));
+    try testing.expectEqual(?Point, types.Field(MaybeTriangle, "a.b"));
+}
+
+// Fields //
+
+test "ntz.types.Fields" {
+    try testing.expectEqual(std.builtin.Type.StructField, types.Fields(Triangle));
+    try testing.expectEqual(std.builtin.Type.StructField, types.Fields(*Triangle));
+    try testing.expectEqual(std.builtin.Type.StructField, types.Fields(?Triangle));
+    try testing.expectEqual(std.builtin.Type.UnionField, types.Fields(Figure));
+    try testing.expectEqual(std.builtin.Type.UnionField, types.Fields(*Figure));
+    try testing.expectEqual(std.builtin.Type.UnionField, types.Fields(?Figure));
 }
 
 // field //
@@ -97,9 +108,17 @@ test "ntz.types.field" {
         .c = .{ .a = .{ .x = 0, .y = 0 }, .b = .{ .x = 3, .y = 0 } },
     } };
 
-    try testing.expectEql(types.field(fig_tri, "triangle.a"), .{ .a = .{ .x = 0, .y = 3 }, .b = .{ .x = 3, .y = 0 } });
-    try testing.expectEql(types.field(fig_tri, "triangle.b.b"), .{ .x = 0, .y = 3 });
-    try testing.expectEql(types.field(fig_tri, "triangle.c.b.x"), 3);
+    try testing.expectEqualDeep(
+        Line{ .a = .{ .x = 0, .y = 3 }, .b = .{ .x = 3, .y = 0 } },
+        types.field(fig_tri, "triangle.a"),
+    );
+
+    try testing.expectEqualDeep(
+        Point{ .x = 0, .y = 3 },
+        types.field(fig_tri, "triangle.b.b"),
+    );
+
+    try testing.expectEqual(3, types.field(fig_tri, "triangle.c.b.x"));
 
     const maybe_tri = MaybeTriangle{
         .a = .{ .a = .{ .x = 0, .y = 3 }, .b = .{ .x = 3, .y = 0 } },
@@ -107,32 +126,29 @@ test "ntz.types.field" {
         .c = null,
     };
 
-    try testing.expectEql(types.field(maybe_tri, "a"), .{ .a = .{ .x = 0, .y = 3 }, .b = .{ .x = 3, .y = 0 } });
-    try testing.expectEql(types.field(maybe_tri, "b.b"), .{ .x = 0, .y = 3 });
-    try testing.expectEql(types.field(maybe_tri, "c.b.x"), 0);
-}
+    try testing.expectEqualDeep(
+        MaybeLine{ .a = .{ .x = 0, .y = 3 }, .b = .{ .x = 3, .y = 0 } },
+        types.field(maybe_tri, "a"),
+    );
 
-// Fields //
+    try testing.expectEqualDeep(
+        Point{ .x = 0, .y = 3 },
+        types.field(maybe_tri, "b.b"),
+    );
 
-test "ntz.types.Fields" {
-    try testing.expectEql(types.Fields(Triangle), std.builtin.Type.StructField);
-    try testing.expectEql(types.Fields(*Triangle), std.builtin.Type.StructField);
-    try testing.expectEql(types.Fields(?Triangle), std.builtin.Type.StructField);
-    try testing.expectEql(types.Fields(Figure), std.builtin.Type.UnionField);
-    try testing.expectEql(types.Fields(*Figure), std.builtin.Type.UnionField);
-    try testing.expectEql(types.Fields(?Figure), std.builtin.Type.UnionField);
+    try testing.expectEqual(0, types.field(maybe_tri, "c.b.x"));
 }
 
 // fields //
 
 test "ntz.types.fields" {
-    try testing.expectEql(types.fields(Triangle).len, 3);
-    try testing.expectEql(types.fields(Line).len, 3);
-    try testing.expectEql(types.fields(*Point).len, 2);
-    try testing.expectEql(types.fields(?Point).len, 2);
-    try testing.expectEql(types.fields(Figure).len, 2);
-    try testing.expectEql(types.fields(*Figure).len, 2);
-    try testing.expectEql(types.fields(?Figure).len, 2);
+    try testing.expectEqual(3, types.fields(Triangle).len);
+    try testing.expectEqual(3, types.fields(Line).len);
+    try testing.expectEqual(2, types.fields(*Point).len);
+    try testing.expectEqual(2, types.fields(?Point).len);
+    try testing.expectEqual(2, types.fields(Figure).len);
+    try testing.expectEqual(2, types.fields(*Figure).len);
+    try testing.expectEqual(2, types.fields(?Figure).len);
 }
 
 // setField //
@@ -144,19 +160,19 @@ test "ntz.types.setField" {
         .c = .{ .a = .{ .x = 0, .y = 0 }, .b = .{ .x = 3, .y = 0 } },
     } };
 
-    try testing.expectEql(fig_tri.triangle.a.b.x, 3);
+    try testing.expectEqual(3, fig_tri.triangle.a.b.x);
     types.setField(&fig_tri, "triangle.a.b.x", 2);
-    try testing.expectEql(fig_tri.triangle.a.b.x, 2);
+    try testing.expectEqual(2, fig_tri.triangle.a.b.x);
 
-    try testing.expectEqlStrs(fig_tri.triangle.a.name, "");
+    try testing.expectEqualStrings("", fig_tri.triangle.a.name);
     types.setField(&fig_tri, "triangle.a.name", "Hypotenuse");
-    try testing.expectEqlStrs(fig_tri.triangle.a.name, "Hypotenuse");
+    try testing.expectEqualStrings("Hypotenuse", fig_tri.triangle.a.name);
 
     types.setField(&fig_tri, "triangle.c.name", "Opposite");
-    try testing.expectEqlStrs(fig_tri.triangle.c.name, "Opposite");
+    try testing.expectEqualStrings("Opposite", fig_tri.triangle.c.name);
     types.setField(&fig_tri, "triangle.c.b", .{ .x = 2, .y = 0 });
-    try testing.expectEql(fig_tri.triangle.c.b.x, 2);
-    try testing.expectEql(fig_tri.triangle.c.b.y, 0);
+    try testing.expectEqual(2, fig_tri.triangle.c.b.x);
+    try testing.expectEqual(0, fig_tri.triangle.c.b.y);
 
     var maybe_tri = MaybeTriangle{
         .a = null,
@@ -172,10 +188,10 @@ test "ntz.types.setField" {
     types.setField(&maybe_tri, "c.a", .{ .x = 0, .y = 0 });
     types.setField(&maybe_tri, "c.b", .{ .x = 2, .y = 0 });
 
-    try testing.expectEql(maybe_tri.a.?.a.?, fig_tri.triangle.a.a);
-    try testing.expectEql(maybe_tri.a.?.b.?, fig_tri.triangle.a.b);
-    try testing.expectEql(maybe_tri.b.?.a.?, fig_tri.triangle.b.a);
-    try testing.expectEql(maybe_tri.b.?.b.?, fig_tri.triangle.b.b);
-    try testing.expectEql(maybe_tri.c.?.a.?, fig_tri.triangle.c.a);
-    try testing.expectEql(maybe_tri.c.?.b.?, fig_tri.triangle.c.b);
+    try testing.expectEqual(fig_tri.triangle.a.a, maybe_tri.a.?.a.?);
+    try testing.expectEqual(fig_tri.triangle.a.b, maybe_tri.a.?.b.?);
+    try testing.expectEqual(fig_tri.triangle.b.a, maybe_tri.b.?.a.?);
+    try testing.expectEqual(fig_tri.triangle.b.b, maybe_tri.b.?.b.?);
+    try testing.expectEqual(fig_tri.triangle.c.a, maybe_tri.c.?.a.?);
+    try testing.expectEqual(fig_tri.triangle.c.b, maybe_tri.c.?.b.?);
 }

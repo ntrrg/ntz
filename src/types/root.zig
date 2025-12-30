@@ -11,6 +11,7 @@ pub const bytes = @import("bytes.zig");
 pub const enums = @import("enums.zig");
 pub const errors = @import("errors.zig");
 pub const funcs = @import("funcs.zig");
+pub const iterators = @import("iterators.zig");
 pub const slices = @import("slices.zig");
 //pub const strings = @import("strings.zig");
 pub const structs = @import("structs.zig");
@@ -60,27 +61,6 @@ pub fn Field(comptime T: type, comptime fp: []const u8) type {
     return field_T;
 }
 
-/// Returns the value of a field in `val`. `fp` may be a field name or a field
-/// path.
-///
-/// This is equivalent to `x.a` or `x.a.b`, but it can be done
-/// programmatically.
-///
-/// A field path is a list of fields separated by periods (`.`). All elements
-/// in the field path must be structs or unions, except for the last one.
-pub fn field(val: anytype, comptime fp: []const u8) Field(@TypeOf(val), fp) {
-    const T = @TypeOf(val);
-    const ti = @typeInfo(T);
-
-    if (ti == .optional and @typeInfo(ti.optional.child) == .@"struct")
-        return field(val orelse structs.init(ti.optional.child), fp);
-
-    const field_name, const rest = comptime bytes.split(fp, '.');
-    const field_val = @field(val, field_name);
-    if (rest.len == 0) return field_val;
-    return field(field_val, rest);
-}
-
 /// Returns the type of fields `T` contains. If `T` is a single pointer to a
 /// sctruct or a union, this will use its child type.
 pub fn Fields(comptime T: type) type {
@@ -96,6 +76,27 @@ pub fn Fields(comptime T: type) type {
         .optional => |ti| continue :sw @typeInfo(ti.child),
         else => @compileError(@typeName(T) ++ " doesn't have fields"),
     };
+}
+
+/// Returns the value of a field in `val`. `fp` may be a field name or a field
+/// path.
+///
+/// This is equivalent to `x.a` or `x.a.b`, but it can be done
+/// programmatically.
+///
+/// A field path is a list of fields separated by periods (`.`). All elements
+/// in the field path must be structs or unions, except for the last one.
+pub fn field(value: anytype, comptime fp: []const u8) Field(@TypeOf(value), fp) {
+    const T = @TypeOf(value);
+    const ti = @typeInfo(T);
+
+    if (ti == .optional and @typeInfo(ti.optional.child) == .@"struct")
+        return field(value orelse structs.init(ti.optional.child), fp);
+
+    const field_name, const rest = comptime bytes.split(fp, '.');
+    const field_val = @field(value, field_name);
+    if (rest.len == 0) return field_val;
+    return field(field_val, rest);
 }
 
 /// Returns the list of fields on `T`. If `T` is a single pointer to a sctruct
@@ -126,7 +127,7 @@ pub fn fields(comptime T: type) []const Fields(T) {
 pub fn setField(
     orig: anytype,
     comptime fp: []const u8,
-    val: Field(@TypeOf(orig), fp),
+    value: Field(@TypeOf(orig), fp),
 ) void {
     const T = @TypeOf(orig);
     const ti = @typeInfo(T);
@@ -138,7 +139,7 @@ pub fn setField(
 
     if (child_ti == .optional and @typeInfo(child_ti.optional.child) == .@"struct") {
         var _orig = orig.* orelse structs.init(child_ti.optional.child);
-        setField(&_orig, fp, val);
+        setField(&_orig, fp, value);
         orig.* = _orig;
         return;
     }
@@ -146,9 +147,9 @@ pub fn setField(
     const field_name, const rest = comptime bytes.split(fp, '.');
 
     if (rest.len == 0) {
-        @field(orig, field_name) = val;
+        @field(orig, field_name) = value;
         return;
     }
 
-    return setField(&@field(orig, field_name), rest, val);
+    return setField(&@field(orig, field_name), rest, value);
 }

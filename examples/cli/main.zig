@@ -28,8 +28,8 @@ fn run(
 
     logger.info("preparing buffer for the standart output");
 
-    const std_out = io.stdOut();
-    var bw = io.bufferedWriter(std_out.writer());
+    const stdout = io.stdout();
+    var bw = io.bufferedWriter(stdout);
 
     defer {
         logger.info("flushing the standart output buffer");
@@ -129,7 +129,7 @@ pub fn main() !u8 {
     // File //
 
     const log_file: std.fs.File = blk: {
-        if (opts.log.file.len == 0) break :blk io.stdErr();
+        if (opts.log.file.len == 0) break :blk io.stderr();
 
         const name = opts.log.file;
         const cwd = std.fs.cwd();
@@ -175,7 +175,7 @@ pub fn main() !u8 {
     var log_mutex: std.Thread.Mutex = if (opts.log.file.len > 0)
         std.Thread.Mutex{}
     else
-        io.std_err_mux;
+        io.stderr_mux;
 
     // Encoder //
 
@@ -632,12 +632,12 @@ fn CommandLineInterface(
                 if (!has_value) value = it.next() orelse "";
                 try cli.setLogLevel(opts, value);
             } else if (bytes.equalAny(name, &.{ "-h", "--help" })) {
-                const w = io.stdOut().writer();
+                const w = io.stdout().writer(&.{});
                 const msg = help_message ++ "\n";
                 try std.fmt.format(w, msg, .{ .name = cli.name });
                 std.process.exit(0);
             } else if (bytes.equalAny(name, &.{"--version"})) {
-                const w = io.stdOut().writer();
+                const w = io.stdout().writer(&.{});
                 try std.fmt.format(w, "{s}\n", .{cli.version});
                 std.process.exit(0);
             } else {

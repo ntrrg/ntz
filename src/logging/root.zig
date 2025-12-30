@@ -65,12 +65,12 @@ pub const Logger = @import("logger.zig").Logger;
 /// Creates a simple logger using the standard error as output.
 pub fn init() Logger(std.fs.File.Writer, BasicEncoder, BasicContext, "") {
     var l = initCustom(
-        io.stdErr().writer(),
+        io.stderr().writer(&.{}),
         BasicEncoder{},
         BasicContext,
     );
 
-    l.mutex = &io.std_err_mux;
+    l.mutex = &io.stderr_mux;
     return l.withSeverity(.debug);
 }
 

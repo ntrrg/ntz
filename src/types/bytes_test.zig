@@ -1,9 +1,10 @@
 // Copyright 2024 Miguel Angel Rivera Notararigo. All rights reserved.
 // This source code was released under the MIT license.
 
-const ntz = @import("ntz");
-const testing = ntz.testing;
+const std = @import("std");
+const testing = std.testing;
 
+const ntz = @import("ntz");
 const bytes = ntz.types.bytes;
 
 test "ntz.types.bytes" {}
@@ -15,24 +16,24 @@ test "ntz.types.bytes.append" {
 
     const got = try bytes.append(ally, "hello, world", '!');
     defer ally.free(got);
-    try testing.expectEqlBytes(got, "hello, world!");
+    try testing.expectEqualStrings("hello, world!", got);
 }
 
 // as //
 
 test "ntz.types.bytes.as" {
     const array = [_]u8{ 'a', 'b', 0 };
-    try testing.expectEql(@TypeOf(bytes.as(array).?), []const u8);
-    try testing.expectEql(@TypeOf(bytes.as(&array).?), []const u8);
-    try testing.expectEql(@TypeOf(bytes.as("hello, world!").?), []const u8);
+    try testing.expectEqual([]const u8, @TypeOf(bytes.as(array).?));
+    try testing.expectEqual([]const u8, @TypeOf(bytes.as(&array).?));
+    try testing.expectEqual([]const u8, @TypeOf(bytes.as("hello, world!").?));
 
     const mpz: [*:0]const u8 = array[0..2 :0];
     const slc = bytes.as(mpz).?;
-    try testing.expectEql(@TypeOf(slc), []const u8);
-    try testing.expectEql(slc.len, 2);
+    try testing.expectEqual([]const u8, @TypeOf(slc));
+    try testing.expectEqual(2, slc.len);
 
     const mp: [*]const u8 = &array;
-    try testing.expectEql(bytes.as(mp), null);
+    try testing.expectEqual(null, bytes.as(mp));
 }
 
 // concat //
@@ -42,7 +43,7 @@ test "ntz.types.bytes.concat" {
 
     const got = try bytes.concat(ally, "hello, ", "world!");
     defer ally.free(got);
-    try testing.expectEqlBytes(got, "hello, world!");
+    try testing.expectEqualStrings("hello, world!", got);
 }
 
 // concatMany //
@@ -52,7 +53,7 @@ test "ntz.types.bytes.concatMany" {
 
     const got = try bytes.concatMany(ally, &.{ "hello", ", ", "world", "!" });
     defer ally.free(got);
-    try testing.expectEqlBytes(got, "hello, world!");
+    try testing.expectEqualStrings("hello, world!", got);
 }
 
 // copy //
@@ -62,12 +63,12 @@ test "ntz.types.bytes.copy" {
     var dst: [src.len]u8 = undefined;
     var n = bytes.copy(&dst, src);
 
-    try testing.expectEqlBytes(&dst, src);
-    try testing.expectEql(n, src.len);
+    try testing.expectEqualStrings(src, &dst);
+    try testing.expectEqual(src.len, n);
 
     n = bytes.copyAt(3, &dst, "ab");
-    try testing.expectEqlBytes(&dst, "abcab");
-    try testing.expectEql(n, 2);
+    try testing.expectEqualStrings("abcab", &dst);
+    try testing.expectEqual(2, n);
 }
 
 // copyLtr //
@@ -77,19 +78,19 @@ test "ntz.types.bytes.copyLtr" {
     var dst: [src.len]u8 = undefined;
     var n = bytes.copyLtr(&dst, src);
 
-    try testing.expectEqlBytes(&dst, src);
-    try testing.expectEql(n, src.len);
+    try testing.expectEqualStrings(src, &dst);
+    try testing.expectEqual(src.len, n);
 
     n = bytes.copyLtr(dst[0..3], dst[2..]);
 
-    try testing.expectEqlBytes(&dst, "cdede");
-    try testing.expectEql(n, 3);
+    try testing.expectEqualStrings("cdede", &dst);
+    try testing.expectEqual(3, n);
 
     _ = bytes.copyLtr(&dst, src);
     n = bytes.copyLtr(dst[2..], dst[0..3]);
 
-    try testing.expectEqlBytes(&dst, "ababa");
-    try testing.expectEql(n, 3);
+    try testing.expectEqualStrings("ababa", &dst);
+    try testing.expectEqual(3, n);
 }
 
 // copyMany //
@@ -101,8 +102,8 @@ test "ntz.types.bytes.copyMany" {
     var dst: [5]u8 = undefined;
     const n = bytes.copyMany(&dst, &.{ src1, src2, src3 });
 
-    try testing.expectEqlBytes(&dst, "abcde");
-    try testing.expectEql(n, 5);
+    try testing.expectEqualStrings("abcde", &dst);
+    try testing.expectEqual(5, n);
 }
 
 // copyRtl //
@@ -112,34 +113,34 @@ test "ntz.types.bytes.copyRtl" {
     var dst: [src.len]u8 = undefined;
     var n = bytes.copyRtl(&dst, src);
 
-    try testing.expectEqlBytes(&dst, src);
-    try testing.expectEql(n, src.len);
+    try testing.expectEqualStrings(src, &dst);
+    try testing.expectEqual(src.len, n);
 
     n = bytes.copyRtl(dst[0..3], dst[2..]);
 
-    try testing.expectEqlBytes(&dst, "edede");
-    try testing.expectEql(n, 3);
+    try testing.expectEqualStrings("edede", &dst);
+    try testing.expectEqual(3, n);
 
     _ = bytes.copyRtl(&dst, src);
     n = bytes.copyRtl(dst[2..], dst[0..3]);
 
-    try testing.expectEqlBytes(&dst, "ababc");
-    try testing.expectEql(n, 3);
+    try testing.expectEqualStrings("ababc", &dst);
+    try testing.expectEqual(3, n);
 }
 
 // count //
 
 test "ntz.types.bytes.count" {
-    try testing.expectEql(bytes.count("asd", 'a'), 1);
-    try testing.expectEql(bytes.count("asd", 's'), 1);
-    try testing.expectEql(bytes.count("asd", 'd'), 1);
-    try testing.expectEql(bytes.count("asd", 'f'), 0);
-    try testing.expectEql(bytes.count("www", 'w'), 3);
+    try testing.expectEqual(1, bytes.count("asd", 'a'));
+    try testing.expectEqual(1, bytes.count("asd", 's'));
+    try testing.expectEqual(1, bytes.count("asd", 'd'));
+    try testing.expectEqual(0, bytes.count("asd", 'f'));
+    try testing.expectEqual(3, bytes.count("www", 'w'));
 
-    try testing.expectEql(bytes.countAt(1, "asd", 'a'), 0);
-    try testing.expectEql(bytes.countAt(0, "www", 'w'), 3);
-    try testing.expectEql(bytes.countAt(1, "www", 'w'), 2);
-    try testing.expectEql(bytes.countAt(2, "www", 'w'), 1);
+    try testing.expectEqual(0, bytes.countAt(1, "asd", 'a'));
+    try testing.expectEqual(3, bytes.countAt(0, "www", 'w'));
+    try testing.expectEqual(2, bytes.countAt(1, "www", 'w'));
+    try testing.expectEqual(1, bytes.countAt(2, "www", 'w'));
 }
 
 // endsWith //
@@ -182,53 +183,53 @@ test "ntz.types.bytes.equalAny" {
 // find //
 
 test "ntz.types.bytes.find" {
-    try testing.expectEql(bytes.find("asd", 'a'), 0);
-    try testing.expectEql(bytes.find("asd", 's'), 1);
-    try testing.expectEql(bytes.find("asd", 'd'), 2);
-    try testing.expectEql(bytes.find("asd", 'f'), null);
+    try testing.expectEqual(0, bytes.find("asd", 'a'));
+    try testing.expectEqual(1, bytes.find("asd", 's'));
+    try testing.expectEqual(2, bytes.find("asd", 'd'));
+    try testing.expectEqual(null, bytes.find("asd", 'f'));
 
-    try testing.expectEql(bytes.findAt(1, "asd", 'a'), null);
-    try testing.expectEql(bytes.findAt(3, "asd", 'd'), null);
-    try testing.expectEql(bytes.findAt(0, "asd", 'f'), null);
-    try testing.expectEql(bytes.findAt(3, "asd", 'f'), null);
+    try testing.expectEqual(null, bytes.findAt(1, "asd", 'a'));
+    try testing.expectEqual(null, bytes.findAt(3, "asd", 'd'));
+    try testing.expectEqual(null, bytes.findAt(0, "asd", 'f'));
+    try testing.expectEqual(null, bytes.findAt(3, "asd", 'f'));
 }
 
 // findAny //
 
 test "ntz.types.bytes.findAny" {
-    try testing.expectEql(
+    try testing.expectEqualDeep(
+        bytes.FindAnyResult{ .index = 0, .value = 'a' },
         bytes.findAny("asd", &.{ 'a', 's', 'd' }),
-        .{ .index = 0, .value = 'a' },
     );
 
-    try testing.expectEql(bytes.findAny("asd", &.{}), null);
-    try testing.expectEql(bytes.findAny("asd", &.{'f'}), null);
-    try testing.expectEql(bytes.findAny("asd", &.{ 'f', 'g' }), null);
+    try testing.expectEqual(null, bytes.findAny("asd", &.{}));
+    try testing.expectEqual(null, bytes.findAny("asd", &.{'f'}));
+    try testing.expectEqual(null, bytes.findAny("asd", &.{ 'f', 'g' }));
 
-    try testing.expectEql(
+    try testing.expectEqualDeep(
+        bytes.FindAnyResult{ .index = 1, .value = 's' },
         bytes.findAnyAt(1, "asd", &.{ 'a', 's' }),
-        .{ .index = 1, .value = 's' },
     );
 
-    try testing.expectEql(bytes.findAnyAt(2, "asd", &.{ 'a', 's' }), null);
+    try testing.expectEqual(null, bytes.findAnyAt(2, "asd", &.{ 'a', 's' }));
 }
 
 // findSeq //
 
 test "ntz.types.bytes.findSeq" {
-    try testing.expectEql(bytes.findSeq("asd", "a"), 0);
-    try testing.expectEql(bytes.findSeq("asd", "as"), 0);
-    try testing.expectEql(bytes.findSeq("asd", "asd"), 0);
-    try testing.expectEql(bytes.findSeq("asd", "s"), 1);
-    try testing.expectEql(bytes.findSeq("asd", "sd"), 1);
-    try testing.expectEql(bytes.findSeq("asd", "d"), 2);
-    try testing.expectEql(bytes.findSeq("asd", "f"), null);
+    try testing.expectEqual(0, bytes.findSeq("asd", "a"));
+    try testing.expectEqual(0, bytes.findSeq("asd", "as"));
+    try testing.expectEqual(0, bytes.findSeq("asd", "asd"));
+    try testing.expectEqual(1, bytes.findSeq("asd", "s"));
+    try testing.expectEqual(1, bytes.findSeq("asd", "sd"));
+    try testing.expectEqual(2, bytes.findSeq("asd", "d"));
+    try testing.expectEqual(null, bytes.findSeq("asd", "f"));
 
-    try testing.expectEql(bytes.findSeqAt(1, "asd", "a"), null);
-    try testing.expectEql(bytes.findSeqAt(1, "asd", "as"), null);
-    try testing.expectEql(bytes.findSeqAt(3, "asd", "d"), null);
-    try testing.expectEql(bytes.findSeqAt(0, "asd", "f"), null);
-    try testing.expectEql(bytes.findSeqAt(3, "asd", "f"), null);
+    try testing.expectEqual(null, bytes.findSeqAt(1, "asd", "a"));
+    try testing.expectEqual(null, bytes.findSeqAt(1, "asd", "as"));
+    try testing.expectEqual(null, bytes.findSeqAt(3, "asd", "d"));
+    try testing.expectEqual(null, bytes.findSeqAt(0, "asd", "f"));
+    try testing.expectEqual(null, bytes.findSeqAt(3, "asd", "f"));
 }
 
 // is //
@@ -290,48 +291,48 @@ test "ntz.types.bytes.mut" {
     var in = bytes.mut("hello. world!");
     in[5] = ',';
     const want = "hello, world!";
-    try testing.expectEqlBytes(&in, want);
+    try testing.expectEqualStrings(want, &in);
 }
 
 // split //
 
 test "ntz.types.bytes.split" {
     var first, var rest = bytes.split("asd", 'a');
-    try testing.expectEqlBytes(first, "");
-    try testing.expectEqlBytes(rest, "sd");
+    try testing.expectEqualStrings("", first);
+    try testing.expectEqualStrings("sd", rest);
 
     first, rest = bytes.split("asd", 's');
-    try testing.expectEqlBytes(first, "a");
-    try testing.expectEqlBytes(rest, "d");
+    try testing.expectEqualStrings("a", first);
+    try testing.expectEqualStrings("d", rest);
 
     first, rest = bytes.split("asd", 'd');
-    try testing.expectEqlBytes(first, "as");
-    try testing.expectEqlBytes(rest, "");
+    try testing.expectEqualStrings("as", first);
+    try testing.expectEqualStrings("", rest);
 
     first, rest = bytes.split("asd", 'f');
-    try testing.expectEqlBytes(first, "asd");
-    try testing.expectEqlBytes(rest, "");
+    try testing.expectEqualStrings("asd", first);
+    try testing.expectEqualStrings("", rest);
 
     first, rest = bytes.splitAt(1, "asd", 'a');
-    try testing.expectEqlBytes(first, "sd");
-    try testing.expectEqlBytes(rest, "");
+    try testing.expectEqualStrings("sd", first);
+    try testing.expectEqualStrings("", rest);
 
     first, rest = bytes.splitAt(2, "asd", 'd');
-    try testing.expectEqlBytes(first, "");
-    try testing.expectEqlBytes(rest, "");
+    try testing.expectEqualStrings("", first);
+    try testing.expectEqualStrings("", rest);
 
     first, rest = bytes.splitAt(0, "asd", 'f');
-    try testing.expectEqlBytes(first, "asd");
-    try testing.expectEqlBytes(rest, "");
+    try testing.expectEqualStrings("asd", first);
+    try testing.expectEqualStrings("", rest);
 }
 
 // splitCount //
 
 test "ntz.types.bytes.splitCount" {
-    try testing.expectEql(bytes.splitCount("asd", 'a'), 2);
-    try testing.expectEql(bytes.splitCount("asd", 's'), 2);
-    try testing.expectEql(bytes.splitCount("asd", 'd'), 2);
-    try testing.expectEql(bytes.splitCount("asd", 'f'), 1);
+    try testing.expectEqual(2, bytes.splitCount("asd", 'a'));
+    try testing.expectEqual(2, bytes.splitCount("asd", 's'));
+    try testing.expectEqual(2, bytes.splitCount("asd", 'd'));
+    try testing.expectEqual(1, bytes.splitCount("asd", 'f'));
 }
 
 // splitn //
@@ -341,18 +342,18 @@ test "ntz.types.bytes.splitn" {
 
     var got = try bytes.splitn(1, &out, "asd", 'a');
     var want: []const []const u8 = &.{ "", "sd" };
-    for (0..want.len) |i| try testing.expectEqlBytes(got[i], want[i]);
-    try testing.expectEql(got.len, 2);
+    for (0..want.len) |i| try testing.expectEqualStrings(want[i], got[i]);
+    try testing.expectEqual(2, got.len);
 
     got = try bytes.splitn(1, &out, "asd", 's');
     want = &.{ "a", "d" };
-    for (0..want.len) |i| try testing.expectEqlBytes(got[i], want[i]);
-    try testing.expectEql(got.len, 2);
+    for (0..want.len) |i| try testing.expectEqualStrings(want[i], got[i]);
+    try testing.expectEqual(2, got.len);
 
     got = try bytes.splitn(1, &out, "asd", 'd');
     want = &.{ "as", "" };
-    for (0..want.len) |i| try testing.expectEqlBytes(got[i], want[i]);
-    try testing.expectEql(got.len, 2);
+    for (0..want.len) |i| try testing.expectEqualStrings(want[i], got[i]);
+    try testing.expectEqual(2, got.len);
 }
 
 // startsWith //
@@ -377,17 +378,17 @@ test "ntz.types.bytes.Buffer" {
     defer buf.deinit();
 
     var n = try buf.write("hello, world");
-    try testing.expectEqlBytes(buf.bytes(), "hello, world");
-    try testing.expectEql(n, 12);
+    try testing.expectEqualStrings("hello, world", buf.bytes());
+    try testing.expectEqual(12, n);
 
     n = try buf.write("!");
-    try testing.expectEqlBytes(buf.bytes(), "hello, world!");
-    try testing.expectEql(n, 1);
+    try testing.expectEqualStrings("hello, world!", buf.bytes());
+    try testing.expectEqual(1, n);
 
     n = try buf.write(" and bye..");
-    try testing.expectEql(n, 10);
-    try testing.expectEqlBytes(buf.bytes(), "hello, world! and bye..");
+    try testing.expectEqual(10, n);
+    try testing.expectEqualStrings("hello, world! and bye..", buf.bytes());
 
     buf.clear();
-    try testing.expectEqlBytes(buf.bytes(), "");
+    try testing.expectEqualStrings("", buf.bytes());
 }

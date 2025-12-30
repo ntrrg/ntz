@@ -1,10 +1,11 @@
 // Copyright 2023 Miguel Angel Rivera Notararigo. All rights reserved.
 // This source code was released under the MIT license.
 
+const std = @import("std");
+const testing = std.testing;
+
 const ntz = @import("ntz");
-const testing = ntz.testing;
 const types = ntz.types;
-const errors = types.errors;
 const bytes = types.bytes;
 
 const io = ntz.io;
@@ -33,7 +34,7 @@ fn SingleByteWriter(comptime T: type) type {
 
         writer: T,
 
-        pub const WriteError = errors.From(T);
+        pub const WriteError = T.Error;
 
         pub fn write(sbw: Self, data: []const u8) WriteError!usize {
             if (data.len == 0) return 0;
@@ -47,14 +48,15 @@ test "ntz.io.writeAll" {
 
     var buf = bytes.buffer(ally);
     defer buf.deinit();
-    var cw = io.countingWriter(&buf);
+    var cw = io.countingWriter(buf.writer());
+    const w = cw.writer();
 
-    const sbw = SingleByteWriter(*@TypeOf(cw)){ .writer = &cw };
+    const sbw = SingleByteWriter(@TypeOf(w)){ .writer = w };
 
     const in = "hello, world!";
     const n = try io.writeAll(sbw, in);
-    try testing.expectEqlStrs(buf.bytes(), in);
-    try testing.expectEql(n, 13);
-    try testing.expectEql(cw.write_count, 13);
-    try testing.expectEql(cw.byte_count, 13);
+    try testing.expectEqualStrings(in, buf.bytes());
+    try testing.expectEqual(13, n);
+    try testing.expectEqual(13, cw.write_count);
+    try testing.expectEqual(13, cw.byte_count);
 }

@@ -4,7 +4,6 @@
 const io = @import("root.zig");
 const types = @import("../types/root.zig");
 const bytes = types.bytes;
-const errors = types.errors;
 
 /// Creates a writer that actually writes once its buffer has been filled.
 pub fn init(writer: anytype) BufferedWriter(@TypeOf(writer), 4096) {
@@ -27,8 +26,7 @@ pub fn BufferedWriter(
     return struct {
         const Self = @This();
 
-        pub const Error = WriterError;
-        pub const WriterError = errors.From(Writer);
+        pub const Error = Writer.Error;
 
         w: Writer,
         buf: [size]u8 = undefined,
@@ -36,7 +34,7 @@ pub fn BufferedWriter(
 
         /// Writes any buffered bytes to the underlying writer and restores the
         /// buffer to its full capacity.
-        pub fn flush(bw: *Self) WriterError!void {
+        pub fn flush(bw: *Self) Error!void {
             if (bw.end == 0) return;
             _ = try bw.w.write(bw.buf[0..bw.end]);
             bw.end = 0;
@@ -45,7 +43,7 @@ pub fn BufferedWriter(
         /// Writes bytes into a buffer until it is full.
         ///
         /// Use the `.flush` method for writing remaining bytes.
-        pub fn write(bw: *Self, data: []const u8) WriterError!usize {
+        pub fn write(bw: *Self, data: []const u8) Error!usize {
             var i: usize = 0;
 
             while (i < data.len) {
@@ -58,7 +56,7 @@ pub fn BufferedWriter(
             return data.len;
         }
 
-        pub fn writer(dw: *Self) io.Writer(*Self, WriterError, write) {
+        pub fn writer(dw: *Self) io.Writer(*Self, Error, write) {
             return .{ .writer = dw };
         }
     };

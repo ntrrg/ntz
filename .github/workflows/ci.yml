@@ -28,7 +28,7 @@ jobs:
       - name: Set up Zig
         uses: mlugg/setup-zig@v2
         with:
-          version: '0.14.0'
+          version: '0.15.2'
 
       - name: Get source code
         uses: actions/checkout@v4
@@ -36,9 +36,11 @@ jobs:
       - name: Lint
         run: zig fmt --check --ast-check build.zig.zon build.zig src examples
 
-      - name: Build (Linux ${{ matrix.linux_arch }} ${{ matrix.optimize }})
+      - name: Build (linux-${{ matrix.linux_arch }}-${{ matrix.optimize }})
         if: matrix.os == 'ubuntu-latest'
-        run: zig build -p zig-out/ntz-linux-${{ matrix.linux_arch }}-${{ matrix.optimize }} -Dtarget=${{ matrix.linux_arch }}-linux -Doptimize=${{ matrix.optimize }}
+        run: |
+          zig build -Dtarget=${{ matrix.linux_arch }}-linux -Doptimize=${{ matrix.optimize }}
+          zig build -Ddynamic -Dtarget=${{ matrix.linux_arch }}-linux -Doptimize=${{ matrix.optimize }}
 
       - name: Tests
         run: zig build --summary all test
@@ -51,11 +53,11 @@ jobs:
       #  if: matrix.os == 'ubuntu-latest'
       #  run: zig build -fwasmtime -Dtarget=wasm32-wasi --summary all test
 
-      - name: Package (Linux ${{ matrix.linux_arch }} ${{ matrix.optimize }})
+      - name: Package (linux-${{ matrix.linux_arch }}-${{ matrix.optimize }})
         if: matrix.os == 'ubuntu-latest'
         run: |
           mkdir -p dist
-          tar -cvzf dist/ntz-${{ github.ref_name }}-linux-${{ matrix.linux_arch }}-${{ matrix.optimize }}.tar.gz -C zig-out/ntz-linux-${{ matrix.linux_arch }}-${{ matrix.optimize }} .
+          tar -cvzf dist/ntz-${{ github.ref_name }}-linux-${{ matrix.linux_arch }}-${{ matrix.optimize }}.tar.gz -C zig-out .
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
