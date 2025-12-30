@@ -1,9 +1,10 @@
 // Copyright 2023 Miguel Angel Rivera Notararigo. All rights reserved.
 // This source code was released under the MIT license.
 
-const ntz = @import("ntz");
-const testing = ntz.testing;
+const std = @import("std");
+const testing = std.testing;
 
+const ntz = @import("ntz");
 const structs = ntz.types.structs;
 
 test "ntz.types.structs" {}
@@ -22,18 +23,18 @@ const Line = struct {
 
 test "ntz.types.structs.init" {
     const line = structs.init(Line);
-    try testing.expectEql(line.a, .{ .x = 0, .y = 0 });
-    try testing.expectEql(line.b.x, 0);
-    try testing.expectEql(line.b.y, 0);
+    try testing.expectEqualDeep(Point{ .x = 0, .y = 0 }, line.a);
+    try testing.expectEqual(0, line.b.x);
+    try testing.expectEqual(0, line.b.y);
 }
 
 // initWith //
 
 test "ntz.types.structs.initWith" {
     const line = structs.initWith(Line, .{ .b = .{ .x = 2, .y = 3 } });
-    try testing.expectEql(line.a, .{ .x = 0, .y = 0 });
-    try testing.expectEql(line.b.x, 2);
-    try testing.expectEql(line.b.y, 3);
+    try testing.expectEqualDeep(Point{ .x = 0, .y = 0 }, line.a);
+    try testing.expectEqual(2, line.b.x);
+    try testing.expectEqual(3, line.b.y);
 }
 
 //// //////////

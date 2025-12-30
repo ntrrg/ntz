@@ -1,10 +1,12 @@
 // Copyright 2023 Miguel Angel Rivera Notararigo. All rights reserved.
 // This source code was released under the MIT license.
 
+const std = @import("std");
+const testing = std.testing;
+
 const ntz = @import("ntz");
 const encoding = ntz.encoding;
 const ctxlog = encoding.ctxlog;
-const testing = ntz.testing;
 const types = ntz.types;
 const bytes = types.bytes;
 
@@ -15,11 +17,14 @@ test "ntz.logging.Logger" {
 
     var buf = bytes.buffer(ally);
     defer buf.deinit();
-    const w = buf.writer();
+    var buf_writer = buf.writer().stdWriter(&.{});
+    var w = &buf_writer.interface;
+    _ = &w;
 
-    const e = ctxlog.Encoder{};
+    var field_name_buf: [32]u8 = undefined;
+    const e = ctxlog.Encoder.init(&field_name_buf);
 
-    const log = logging.initCustom(w, e, struct {
+    const log = logging.init(w, e, struct {
         level: []const u8,
 
         http: ?struct {
@@ -39,9 +44,9 @@ test "ntz.logging.Logger" {
     buf.clear();
     log.info("hello, world!");
 
-    try testing.expectEqlStrs(
-        buf.bytes(),
+    try testing.expectEqualStrings(
         "level=\"INFO\" msg=\"hello, world!\"\n",
+        buf.bytes(),
     );
 
     // Severity.
@@ -50,7 +55,7 @@ test "ntz.logging.Logger" {
     const warn_log = log.withSeverity(.warn);
     warn_log.info("hello, world!");
 
-    try testing.expectEqlStrs(buf.bytes(), "");
+    try testing.expectEqualStrings("", buf.bytes());
 
     // Scoping
 
@@ -63,14 +68,14 @@ test "ntz.logging.Logger" {
         .with("response.status", 200)
         .info("hello, request!");
 
-    try testing.expectEqlStrs(
-        buf.bytes(),
+    try testing.expectEqualStrings(
         "level=\"INFO\" http.request.method=\"GET\" http.request.url=\"http://localhost/\" http.response.status=200 msg=\"hello, request!\"\n",
+        buf.bytes(),
     );
 
     // onLog method.
 
-    const timed_log = logging.initCustom(w, e, struct {
+    const timed_log = logging.init(w, e, struct {
         const Self = @This();
 
         time: u64,
@@ -87,8 +92,8 @@ test "ntz.logging.Logger" {
     buf.clear();
     timed_log.err("hello, timed log!");
 
-    try testing.expectEqlStrs(
-        buf.bytes(),
+    try testing.expectEqualStrings(
         "time=42 level=\"ERROR\" msg=\"hello, timed log!\"\n",
+        buf.bytes(),
     );
 }

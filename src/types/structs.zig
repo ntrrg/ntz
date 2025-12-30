@@ -19,11 +19,11 @@ pub fn init(comptime T: type) T {
     return std.mem.zeroes(T);
 }
 
-/// Creates a value of `T` reusing values from matching fields in `val`.
+/// Creates a value of `T` reusing values from matching fields in `value`.
 ///
-/// If no matching field is found in `val`, their zero value will be used.
-pub fn initWith(comptime T: type, val: anytype) T {
-    return std.mem.zeroInit(T, val);
+/// If no matching field is found in `value`, their zero value will be used.
+pub fn initWith(comptime T: type, value: anytype) T {
+    return std.mem.zeroInit(T, value);
 }
 
 ///// Allows to create structs programmatically.

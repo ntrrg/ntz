@@ -6,24 +6,31 @@
 //! Contextual logging encoding.
 
 const std = @import("std");
+const Writer = std.Io.Writer;
 
 const encoding = @import("../root.zig");
 const unicode = encoding.unicode;
 const utf8 = unicode.utf8;
 const types = @import("../../types/root.zig");
 const bytes = types.bytes;
-const errors = types.errors;
 const funcs = types.funcs;
 const slices = types.slices;
 
 pub const Encoder = struct {
     const Self = @This();
 
-    pub const Error = EncodeError;
+    pub const Error = error{
+        UnboundedPointer,
+        UnkownType,
+        UntaggedUnion,
+    } || bytes.SliceFixed.Error;
+
+    /// Bytes to be escaped in strings.
+    const escape_seq: []const u8 = "\"\n\r\t";
 
     pub const Options = struct {
         /// Field name.
-        field_name: []const u8 = "",
+        field_name: bytes.SliceFixed,
 
         /// Ignore empty struct fields (strings and arrays).
         omit_empty: bool = true,
@@ -32,34 +39,28 @@ pub const Encoder = struct {
         omit_null: bool = true,
     };
 
-    options: Options = .{},
+    options: Options,
 
-    pub fn init() Self {
-        return .{};
+    pub fn init(field_name_buf: []u8) Self {
+        return .{
+            .options = .{ .field_name = .{ .data = field_name_buf } },
+        };
     }
 
-    pub const EncodeError = error{
-        UnboundedPointer,
-        UnkownType,
-        UntaggedUnion,
-    };
-
-    /// Encodes a value into the given writer.
+    /// Encodes a value.
     ///
     /// If `val` has a method `.asCtxlog`, it will be used instead of default
     /// encoding. Field name writing is delegated to this method. This method
     /// must be of the following type:
     ///
     /// ```zig
-    /// pub fn asCtxlog(_: Self, writer: anytype, enc: Encoder) !void
+    /// pub fn asCtxlog(_: Self, w: *std.Io.Writer, enc: Encoder) !void
     /// ```
-    ///
-    /// Field names have a limit of 64 bytes.
     pub fn encode(
         e: Self,
-        writer: anytype,
+        writer: *Writer,
         value: anytype,
-    ) (EncodeError || errors.From(@TypeOf(writer)))!void {
+    ) (Error || Writer.Error)!void {
         const T = @TypeOf(value);
         const ti = @typeInfo(T);
 
@@ -81,39 +82,63 @@ pub const Encoder = struct {
             .error_union => try e.encodeErrorUnion(writer, value),
             .void => try e.encodeVoid(writer),
             .type => try e.encodeType(writer, value),
-            else => return EncodeError.UnkownType,
+            else => return error.UnkownType,
         }
     }
 
     pub fn encodeBoolean(
         _: Self,
-        writer: anytype,
+        writer: *Writer,
         value: bool,
-    ) errors.From(@TypeOf(writer))!void {
+    ) Writer.Error!void {
         _ = try writer.write(if (value) "true" else "false");
+    }
+
+    pub fn encodeBytes(
+        _: Self,
+        writer: *Writer,
+        value: []const u8,
+    ) Writer.Error!void {
+        var i: usize = 0;
+
+        while (bytes.findAnyAt(i, value, escape_seq)) |res| {
+            _ = try writer.write(value[i..res.index]);
+            _ = try writer.write("\\");
+
+            switch (res.value) {
+                '\n' => _ = try writer.write("n"),
+                '\r' => _ = try writer.write("r"),
+                '\t' => _ = try writer.write("t"),
+                else => _ = try writer.write(&.{res.value}),
+            }
+
+            i = res.index + 1;
+        }
+
+        if (i < value.len) _ = try writer.write(value[i..]);
     }
 
     pub fn encodeEnum(
         e: Self,
-        writer: anytype,
+        writer: *Writer,
         value: anytype,
-    ) errors.From(@TypeOf(writer))!void {
+    ) Writer.Error!void {
         return e.encodeString(writer, @tagName(value));
     }
 
     pub fn encodeError(
         e: Self,
-        writer: anytype,
+        writer: *Writer,
         value: anyerror,
-    ) errors.From(@TypeOf(writer))!void {
+    ) Writer.Error!void {
         return e.encodeString(writer, @errorName(value));
     }
 
     pub fn encodeErrorUnion(
         e: Self,
-        writer: anytype,
+        writer: *Writer,
         value: anytype,
-    ) (EncodeError || errors.From(@TypeOf(writer)))!void {
+    ) (Error || Writer.Error)!void {
         if (value) |v| {
             return e.encode(writer, v);
         } else |err| {
@@ -123,10 +148,10 @@ pub const Encoder = struct {
 
     pub fn encodeIterable(
         e: Self,
-        writer: anytype,
+        writer: *Writer,
         value: anytype,
-    ) (EncodeError || errors.From(@TypeOf(writer)))!void {
-        const _e = e.withField("");
+    ) (Error || Writer.Error)!void {
+        var _e = try e.withField("");
 
         _ = try writer.write("[");
 
@@ -140,26 +165,17 @@ pub const Encoder = struct {
 
     pub fn encodeNumber(
         _: Self,
-        writer: anytype,
+        writer: *Writer,
         value: anytype,
-    ) errors.From(@TypeOf(writer))!void {
-        const std_writer = if (comptime funcs.hasFn(@TypeOf(writer), "writeAll"))
-            writer
-        else if (comptime funcs.hasFn(@TypeOf(writer), "stdWriter"))
-            writer.stdWriter()
-        else if (comptime funcs.hasFn(@TypeOf(writer), "writer"))
-            writer.writer().stdWriter()
-        else
-            std.io.GenericWriter(@TypeOf(writer), @TypeOf(writer).Error, @TypeOf(writer).write){ .context = writer };
-
-        try std.fmt.format(std_writer, "{d}", .{value});
+    ) Writer.Error!void {
+        try writer.print("{d}", .{value});
     }
 
     pub fn encodeOptional(
         e: Self,
-        writer: anytype,
+        writer: *Writer,
         value: anytype,
-    ) (EncodeError || errors.From(@TypeOf(writer)))!void {
+    ) (Error || Writer.Error)!void {
         if (value) |v| {
             try e.encode(writer, v);
         } else {
@@ -169,9 +185,9 @@ pub const Encoder = struct {
 
     pub fn encodePointer(
         e: Self,
-        writer: anytype,
+        writer: *Writer,
         value: anytype,
-    ) (EncodeError || errors.From(@TypeOf(writer)))!void {
+    ) (Error || Writer.Error)!void {
         if (slices.as(value)) |slc| {
             if (types.Child(@TypeOf(slc)) == u8 and utf8.isValid(slc)) {
                 return e.encodeString(writer, slc);
@@ -189,39 +205,21 @@ pub const Encoder = struct {
         }
     }
 
-    const escape_seq: []const u8 = "\"\n";
-
     pub fn encodeString(
-        _: Self,
-        writer: anytype,
+        e: Self,
+        writer: *Writer,
         value: []const u8,
-    ) errors.From(@TypeOf(writer))!void {
+    ) Writer.Error!void {
         _ = try writer.write("\"");
-
-        var i: usize = 0;
-
-        while (bytes.findAnyAt(i, value, escape_seq)) |res| {
-            _ = try writer.write(value[i..res.index]);
-            _ = try writer.write("\\");
-
-            switch (res.value) {
-                '\n' => _ = try writer.write("n"),
-                else => _ = try writer.write(&.{res.value}),
-            }
-
-            i = res.index + 1;
-        }
-
-        if (i < value.len) _ = try writer.write(value[i..]);
-
+        try e.encodeBytes(writer, value);
         _ = try writer.write("\"");
     }
 
     pub fn encodeStruct(
         e: Self,
-        writer: anytype,
+        writer: *Writer,
         value: anytype,
-    ) (EncodeError || errors.From(@TypeOf(writer)))!void {
+    ) (Error || Writer.Error)!void {
         const T = @TypeOf(value);
         const ti = @typeInfo(T).@"struct";
 
@@ -229,85 +227,49 @@ pub const Encoder = struct {
 
         inline for (ti.fields) |field| {
             blk: {
-                const field_ti = @typeInfo(field.type);
-                const field_val = @field(value, field.name);
-
-                if (e.shouldOmit(field_val)) break :blk;
-
+                if (e.shouldOmit(@field(value, field.name))) break :blk;
                 if (should_space) _ = try writer.write(" ");
+                const field_val = @field(value, field.name);
+                try e.encodeStructField(writer, field, field_val);
                 should_space = true;
-
-                var field_name: [64]u8 = undefined;
-
-                const j = bytes.copyMany(&field_name, &.{
-                    e.options.field_name,
-                    if (e.options.field_name.len > 0) "." else "",
-                    field.name,
-                });
-
-                const _e = e.withField(field_name[0..j]);
-
-                if (comptime funcs.hasFn(field.type, "asCtxlog")) {
-                    try field_val.asCtxlog(writer, _e);
-                    break :blk;
-                }
-
-                var should_field = true;
-
-                switch (field_ti) {
-                    .@"struct" => should_field = false,
-
-                    .optional => |child_ti| {
-                        if (@typeInfo(child_ti.child) == .@"struct" and field_val != null)
-                            should_field = false;
-                    },
-
-                    .pointer => |child_ti| {
-                        if (child_ti.size == .one and @typeInfo(child_ti.child) == .@"struct")
-                            should_field = false;
-                    },
-
-                    .@"union" => |child_ti| {
-                        if (child_ti.tag_type) |Tag| {
-                            inline for (child_ti.fields) |u_field| {
-                                if (field_val == @field(Tag, u_field.name)) {
-                                    if (@typeInfo(u_field.type) == .@"struct")
-                                        should_field = false;
-                                }
-                            }
-                        }
-                    },
-
-                    else => should_field = true,
-                }
-
-                if (should_field) {
-                    _ = try writer.write(_e.options.field_name);
-                    _ = try writer.write("=");
-                }
-
-                try _e.encode(writer, field_val);
             }
         }
     }
 
-    pub fn encodeType(
+    pub fn encodeStructField(
         e: Self,
-        writer: anytype,
-        value: type,
-    ) errors.From(@TypeOf(writer))!void {
+        writer: *Writer,
+        field: std.builtin.Type.StructField,
+        value: anytype,
+    ) (Error || Writer.Error)!void {
+        const _e = try e.withField(field.name);
+
+        if (comptime funcs.hasFn(field.type, "asCtxlog")) {
+            try value.asCtxlog(writer, _e);
+            return;
+        }
+
+        if (e.shouldWriteField(value)) {
+            _ = try writer.write(_e.options.field_name.items());
+            _ = try writer.write("=");
+        }
+
+        try _e.encode(writer, value);
+    }
+
+    pub fn encodeType(e: Self, writer: *Writer, value: type) Writer.Error!void {
         try e.encodeString(writer, @typeName(value));
     }
 
     pub fn encodeUnion(
         e: Self,
-        writer: anytype,
+        writer: *Writer,
         value: anytype,
-    ) (EncodeError || errors.From(@TypeOf(writer)))!void {
+    ) (Error || Writer.Error)!void {
         const T = @TypeOf(value);
         const ti = @typeInfo(T).@"union";
 
-        if (ti.tag_type == null) return EncodeError.UntaggedUnion;
+        if (ti.tag_type == null) return error.UntaggedUnion;
 
         const Tag = ti.tag_type.?;
 
@@ -326,9 +288,9 @@ pub const Encoder = struct {
 
     pub fn encodeVector(
         e: Self,
-        writer: anytype,
+        writer: *Writer,
         value: anytype,
-    ) (EncodeError || errors.From(@TypeOf(writer)))!void {
+    ) (Error || Writer.Error)!void {
         const T = @TypeOf(value);
         const ti = @typeInfo(T).vector;
 
@@ -336,10 +298,7 @@ pub const Encoder = struct {
         try e.encodePointer(writer, &arr);
     }
 
-    pub fn encodeVoid(
-        _: Self,
-        writer: anytype,
-    ) errors.From(@TypeOf(writer))!void {
+    pub fn encodeVoid(_: Self, writer: *Writer) Writer.Error!void {
         _ = try writer.write("null");
     }
 
@@ -360,9 +319,53 @@ pub const Encoder = struct {
         };
     }
 
-    pub fn withField(e: Self, field_name: []const u8) Self {
+    pub fn shouldWriteField(_: Self, value: anytype) bool {
+        switch (@typeInfo(@TypeOf(value))) {
+            .@"struct" => return false,
+
+            .optional => |child_ti| {
+                if (@typeInfo(child_ti.child) == .@"struct" and
+                    value != null)
+                    return false;
+            },
+
+            .pointer => |child_ti| {
+                if (child_ti.size == .one and
+                    @typeInfo(child_ti.child) == .@"struct")
+                    return false;
+            },
+
+            .@"union" => |child_ti| {
+                if (child_ti.tag_type) |Tag| {
+                    inline for (child_ti.fields) |u_field| {
+                        if (value == @field(Tag, u_field.name)) {
+                            if (@typeInfo(u_field.type) == .@"struct")
+                                return false;
+                        }
+                    }
+                }
+            },
+
+            else => return true,
+        }
+
+        return true;
+    }
+
+    pub fn withField(
+        e: Self,
+        field_name: []const u8,
+    ) bytes.SliceFixed.Error!Self {
         var opts = e.options;
-        opts.field_name = field_name;
+
+        if (field_name.len == 0) {
+            opts.field_name.data = opts.field_name.data[opts.field_name.len..];
+            opts.field_name.len = 0;
+        } else {
+            if (opts.field_name.len > 0) try opts.field_name.append('.');
+            try opts.field_name.appendMany(field_name);
+        }
+
         return Self{ .options = opts };
     }
 };

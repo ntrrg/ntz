@@ -5,17 +5,46 @@
 //!
 //! Utilities for working with slices.
 
+const std = @import("std");
+const Allocator = std.mem.Allocator;
+
 const types = @import("root.zig");
-const errors = types.errors;
+const iterators = types.iterators;
+
+/// Returns the child type of the given slice-able type.
+pub fn Child(comptime T: type) type {
+    const err_msg = @typeName(T) ++ " is not a slice-able type";
+
+    return switch (@typeInfo(T)) {
+        .pointer => |ti| switch (ti.size) {
+            .slice => ti.child,
+
+            .one => switch (@typeInfo(ti.child)) {
+                .array => |child_ti| return child_ti.child,
+                else => @compileError(err_msg),
+            },
+
+            .many => if (ti.sentinel()) |_|
+                ti.child
+            else
+                @compileError(err_msg),
+
+            else => @compileError(err_msg),
+        },
+
+        .array => |ti| ti.child,
+        else => @compileError(err_msg),
+    };
+}
 
 /// Creates a new slice that contains all items from `these` and adds `that` at
 /// the end of it.
 pub fn append(
     comptime T: type,
-    allocator: anytype,
+    allocator: Allocator,
     these: []const T,
     that: T,
-) ![]T {
+) Allocator.Error![]T {
     var new = try allocator.alloc(T, these.len + 1);
     errdefer allocator.free(new);
     @memcpy(new[0..these.len], these);
@@ -56,39 +85,13 @@ pub fn as(value: anytype) ?[]const types.Child(@TypeOf(value)) {
     };
 }
 
-/// Returns the child type of the given slice-able type.
-pub fn Child(comptime T: type) type {
-    const err_msg = @typeName(T) ++ " is not a slice-able type";
-
-    return switch (@typeInfo(T)) {
-        .pointer => |ti| switch (ti.size) {
-            .slice => ti.child,
-
-            .one => switch (@typeInfo(ti.child)) {
-                .array => |child_ti| return child_ti.child,
-                else => @compileError(err_msg),
-            },
-
-            .many => if (ti.sentinel()) |_|
-                ti.child
-            else
-                @compileError(err_msg),
-
-            else => @compileError(err_msg),
-        },
-
-        .array => |ti| ti.child,
-        else => @compileError(err_msg),
-    };
-}
-
 /// Creates a new slice that contains all items from `these` and `those`.
 pub fn concat(
     comptime T: type,
-    allocator: anytype,
+    allocator: Allocator,
     these: []const T,
     those: []const T,
-) ![]T {
+) Allocator.Error![]T {
     var new = try allocator.alloc(T, these.len + those.len);
     errdefer allocator.free(new);
     _ = copyMany(T, new[0..], &.{ these, those });
@@ -98,9 +101,9 @@ pub fn concat(
 /// Creates a new slice that contains all items from the given slices.
 pub fn concatMany(
     comptime T: type,
-    allocator: anytype,
+    allocator: Allocator,
     these: []const []const T,
-) ![]T {
+) Allocator.Error![]T {
     var n: usize = 0;
     for (these) |s| n += s.len;
     var new = try allocator.alloc(T, n);
@@ -314,10 +317,10 @@ pub fn findSeqAt(comptime T: type, at: usize, these: []const T, those: []const T
 
 /// Checks if the given value is a slice-able type (arrays and pointers).
 ///
-/// If `val` is a type, this will check if the given type may be coerced to a
+/// If `value` is a type, this will check if the given type may be coerced to a
 /// slice.
-pub fn is(val: anytype) bool {
-    return switch (@typeInfo(@TypeOf(val))) {
+pub fn is(value: anytype) bool {
+    return switch (@typeInfo(@TypeOf(value))) {
         .array => true,
 
         .pointer => |ti| switch (ti.size) {
@@ -351,7 +354,8 @@ pub fn splitAt(comptime T: type, at: usize, these: []const T, that: T) [2][]cons
     return .{ these[at..i], these[i + 1 ..] };
 }
 
-/// Counts how many times `these` may be sliced using `that` as separator.
+/// Counts how many slices may be sliced out of `these` using `that` as
+/// separator.
 pub fn splitCount(comptime T: type, these: []const T, that: T) usize {
     if (these.len == 0) return 1;
     var i: usize = 0;
@@ -366,8 +370,18 @@ pub fn splitCount(comptime T: type, these: []const T, that: T) usize {
     return n;
 }
 
+/// Creates an iterator that splits `these` in any appearance of `that`.
+pub fn splitIterator(
+    comptime T: type,
+    these: []const T,
+    that: T,
+) SplitIterator(T).Iterator {
+    const it = SplitIterator(T){ .data = these, .sep = that };
+    return it.iterator();
+}
+
 pub const SplitError = error{
-    OutOfSpace,
+    OutOfMemory,
 };
 
 /// Splits `these` at the appearances of `that` up to `n` times, the resulting
@@ -394,7 +408,7 @@ pub fn splitnAt(
     these: []const T,
     that: T,
 ) SplitError![]const []const T {
-    if (out.len == 0) return error.OutOfSpace;
+    if (out.len == 0) return error.OutOfMemory;
 
     if (these.len == 0 or n == 0) {
         out[0] = these;
@@ -406,7 +420,7 @@ pub fn splitnAt(
     var split_count: usize = 0;
 
     while (findAt(T, i, these, that)) |j| {
-        if (out_i >= out.len) return error.OutOfSpace;
+        if (out_i >= out.len) return error.OutOfMemory;
         out[out_i] = these[i..j];
         out_i += 1;
 
@@ -416,7 +430,7 @@ pub fn splitnAt(
     }
 
     if (i < these.len or endsWith(T, these, &.{that})) {
-        if (out_i >= out.len) return error.OutOfSpace;
+        if (out_i >= out.len) return error.OutOfMemory;
         out[out_i] = these[i..these.len];
         out_i += 1;
     }
@@ -435,45 +449,37 @@ pub fn startsWith(comptime T: type, these: []const T, prefix: []const T) bool {
 // Iterator //
 // ///////////
 
-/// Creates an iterator from the given type.
-pub fn Iterator(comptime T: type) type {
+fn iteratorNextIndex(comptime T: type) fn (slc: *[]const T, index: usize) usize {
     return struct {
-        const Self = @This();
-
-        index: usize = 0,
-        data: []const T,
-
-        pub fn next(it: *Self) ?T {
-            const val = it.peek() orelse return null;
-            it.index += 1;
-            return val;
+        pub fn nextIndex(_: *[]const T, index: usize) usize {
+            return index +| 1;
         }
+    }.nextIndex;
+}
 
-        pub fn peek(it: Self) ?T {
-            return it.peekN(1);
+fn iteratorGetItem(comptime T: type) fn (slc: *[]const T, index: usize) ?T {
+    return struct {
+        pub fn getItem(slc: *[]const T, index: usize) ?T {
+            return if (index < slc.len) slc.*[index] else null;
         }
+    }.getItem;
+}
 
-        pub fn peekN(it: Self, n: usize) ?T {
-            const i = it.index + n -| 1;
-            if (i >= it.data.len) return null;
-            return it.data[i];
-        }
-
-        pub fn skip(it: *Self) bool {
-            return it.skipN(1);
-        }
-
-        pub fn skipN(it: *Self, n: usize) bool {
-            if (it.index + n > it.data.len) return false;
-            it.index += n;
-            return true;
-        }
-    };
+/// An `iterators.Iterator` implementation for slices.
+pub fn Iterator(comptime T: type) type {
+    return iterators.Iterator(
+        []const T,
+        usize,
+        T,
+        null,
+        iteratorNextIndex(T),
+        iteratorGetItem(T),
+    );
 }
 
 /// Creates an iterator from the given slice-able value.
 pub fn iterator(value: anytype) Iterator(Child(@TypeOf(value))) {
-    return .{ .data = value };
+    return .{ .ctx = value, .index = 0 };
 }
 
 // ////////
@@ -491,13 +497,12 @@ pub fn Slice(comptime T: type) type {
         ptr: [*]T = undefined,
 
         /// Number of items the slice may contain without memory allocations.
-        /// Use the `.cap` method.
         cap: usize = 0,
 
-        /// Number of items the slice contain. Use the `.len` method.
+        /// Number of items the slice contain.
         len: usize = 0,
 
-        pub fn deinit(slc: *Self, allocator: anytype) void {
+        pub fn deinit(slc: *Self, allocator: Allocator) void {
             if (slc.cap == 0) return;
             allocator.free(slc.ptr[0..slc.cap]);
             slc.ptr = undefined;
@@ -505,18 +510,30 @@ pub fn Slice(comptime T: type) type {
             slc.len = 0;
         }
 
-        /// Available slots to be used without memory allocations.
-        pub fn available(slc: Self) usize {
-            return slc.cap - slc.len;
-        }
-
         /// Adds the given item at the end of the slice.
         ///
         /// This only allocates memory when there is not enough capacity.
-        pub fn append(slc: *Self, allocator: anytype, elem: T) !void {
+        pub fn append(
+            slc: *Self,
+            allocator: Allocator,
+            elem: T,
+        ) Allocator.Error!void {
             try slc.ensureCapacity(allocator, slc.len + 1);
             slc.ptr[slc.len] = elem;
             slc.len += 1;
+        }
+
+        /// Adds the given item at the end of the slice and returns its
+        /// pointer.
+        ///
+        /// This only allocates memory when there is not enough capacity.
+        pub fn appendAndReturn(
+            slc: *Self,
+            allocator: Allocator,
+            elem: T,
+        ) Allocator.Error!*T {
+            try slc.append(allocator, elem);
+            return &slc.ptr[slc.len - 1];
         }
 
         /// Adds the given items at the end of the slice.
@@ -524,9 +541,9 @@ pub fn Slice(comptime T: type) type {
         /// This only allocates memory when there is not enough capacity.
         pub fn appendMany(
             slc: *Self,
-            allocator: anytype,
+            allocator: Allocator,
             elems: []const T,
-        ) !void {
+        ) Allocator.Error!void {
             const new_len: usize = slc.len + elems.len;
             try slc.ensureCapacity(allocator, new_len);
             slc.len += copy(T, slc.ptr[slc.len..slc.cap], elems);
@@ -537,28 +554,33 @@ pub fn Slice(comptime T: type) type {
         /// This only allocates memory when there is not enough capacity.
         pub fn appendSlices(
             slc: *Self,
-            allocator: anytype,
+            allocator: Allocator,
             slcs: []const []const T,
-        ) !void {
+        ) Allocator.Error!void {
             var new_len: usize = slc.len;
             for (slcs) |s| new_len += s.len;
             try slc.ensureCapacity(allocator, new_len);
             for (slcs) |s| slc.len += copy(T, slc.ptr[slc.len..slc.cap], s);
         }
 
+        /// Available slots to be used without memory allocations.
+        pub fn available(slc: Self) usize {
+            return slc.cap - slc.len;
+        }
+
         /// Sets the slice as empty.
         ///
-        /// This doesn't deallocate memory.
+        /// This doesn't deallocate memory, use `.deinit` instead.
         pub fn clear(slc: *Self) void {
             slc.len = 0;
         }
 
         /// Creates a copy of the slice using the given allocator.
-        pub fn clone(slc: Self, allocator: anytype) !Self {
-            var ptr: [*]T = slc.ptr;
-
-            if (slc.cap > 0)
-                ptr = (try allocator.dupe(T, slc.ptr[0..slc.cap])).ptr;
+        pub fn clone(slc: Self, allocator: Allocator) Allocator.Error!Self {
+            const ptr: [*]T = if (slc.cap > 0)
+                (try allocator.dupe(T, slc.ptr[0..slc.cap])).ptr
+            else
+                undefined;
 
             return .{
                 .ptr = ptr,
@@ -575,32 +597,55 @@ pub fn Slice(comptime T: type) type {
         /// the slice capacity.
         pub fn ensureCapacity(
             slc: *Self,
-            allocator: anytype,
+            allocator: Allocator,
             size: usize,
-        ) !void {
+        ) Allocator.Error!void {
             if (size <= slc.cap) return;
             const new_size = @max(slc.cap * 2, size);
             try slc.setCapacity(allocator, new_size);
         }
 
         /// Returns the items in the slice.
-        pub fn items(slc: Self) []const T {
+        pub fn items(slc: Self) []T {
             return slc.ptr[0..slc.len];
         }
 
         /// Converts the slice to a managed one that uses the given allocator.
         pub fn managed(
             slc: Self,
-            allocator: anytype,
-        ) SliceManaged(@TypeOf(allocator), T) {
+            allocator: Allocator,
+        ) SliceManaged(T) {
             return .{
                 .ally = allocator,
                 .slc = slc,
             };
         }
 
+        /// Sets the number of items in the slice to the given size.
+        ///
+        /// This doesn't reduce the capacity. If `size` is greater than the
+        /// capacity, memory will be allocated. If `size` is lower than the
+        /// capacity, extra slots will be set as `undefined`.
+        pub fn resize(
+            slc: *Self,
+            allocator: Allocator,
+            size: usize,
+        ) Allocator.Error!void {
+            try slc.ensureCapacity(allocator, size);
+
+            if (size > slc.len) {
+                for (slc.len..size) |i| slc.ptr[i] = undefined;
+            }
+
+            slc.len = size;
+        }
+
         /// Sets the slice capacity to the given size.
-        pub fn setCapacity(slc: *Self, allocator: anytype, size: usize) !void {
+        pub fn setCapacity(
+            slc: *Self,
+            allocator: Allocator,
+            size: usize,
+        ) Allocator.Error!void {
             if (size == 0) return slc.deinit(allocator);
 
             if (slc.cap > 0 and allocator.resize(slc.ptr[0..slc.cap], size)) {
@@ -619,15 +664,95 @@ pub fn Slice(comptime T: type) type {
     };
 }
 
+/// Fixed capacity slice.
+pub fn SliceFixed(comptime T: type) type {
+    return struct {
+        const Self = @This();
+        pub const Error = error{OutOfMemory};
+
+        data: []T = undefined,
+        len: usize = 0,
+
+        /// Creates a self growable copy of the slice.
+        pub fn alloc(slc: Self, allocator: Allocator) Allocator.Error!Slice(T) {
+            return .{
+                .ptr = (try allocator.dupe(T, slc.ptr[0..slc.cap()])).ptr,
+                .cap = slc.cap(),
+                .len = slc.len,
+            };
+        }
+
+        /// Creates a self growable copy of the slice.
+        pub fn allocManaged(
+            slc: Self,
+            allocator: Allocator,
+        ) Allocator.Error!SliceManaged(T) {
+            const new_slc = try slc.alloc(allocator);
+            return new_slc.managed(allocator);
+        }
+
+        /// Adds the given item at the end of the slice.
+        pub fn append(slc: *Self, elem: T) Error!void {
+            try slc.ensureCapacity(slc.len + 1);
+            slc.data[slc.len] = elem;
+            slc.len += 1;
+        }
+
+        /// Adds the given item at the end of the slice and returns its
+        /// pointer.
+        pub fn appendAndReturn(slc: *Self, elem: T) Error!*T {
+            try slc.append(elem);
+            return &slc.data[slc.len - 1];
+        }
+
+        /// Adds the given items at the end of the slice.
+        pub fn appendMany(slc: *Self, elems: []const T) Error!void {
+            const new_len: usize = slc.len + elems.len;
+            try slc.ensureCapacity(new_len);
+            slc.len += copy(T, slc.data[slc.len..], elems);
+        }
+
+        /// Adds the items from all the given slices and the end of the slice.
+        pub fn appendSlices(slc: *Self, slcs: []const []const T) Error!void {
+            var new_len: usize = slc.len;
+            for (slcs) |s| new_len += s.len;
+            try slc.ensureCapacity(new_len);
+            for (slcs) |s| slc.len += copy(T, slc.data[slc.len..], s);
+        }
+
+        /// Available slots to be used.
+        pub fn available(slc: Self) usize {
+            return slc.data.len - slc.len;
+        }
+
+        /// Returns number of items the slice may contain.
+        pub fn cap(slc: Self) usize {
+            return slc.data.len;
+        }
+
+        /// Sets the slice as empty.
+        pub fn clear(slc: *Self) void {
+            slc.len = 0;
+        }
+
+        /// Checks if the slice is capable of storing `size` elements.
+        pub fn ensureCapacity(slc: *Self, size: usize) Error!void {
+            if (size > slc.data.len) return error.OutOfMemory;
+        }
+
+        /// Returns the items in the slice.
+        pub fn items(slc: Self) []T {
+            return slc.data[0..slc.len];
+        }
+    };
+}
+
 /// Self growable slice.
 ///
 /// Allocated memory is owned by the slice.
-pub fn SliceManaged(comptime Allocator: type, comptime T: type) type {
+pub fn SliceManaged(comptime T: type) type {
     return struct {
         const Self = @This();
-
-        pub const Error = AllocatorError;
-        pub const AllocatorError = errors.From(Allocator);
 
         ally: Allocator,
         slc: Slice(T),
@@ -636,22 +761,25 @@ pub fn SliceManaged(comptime Allocator: type, comptime T: type) type {
             slc.slc.deinit(slc.ally);
         }
 
-        /// Available slots to be used without memory allocations.
-        pub fn available(slc: Self) usize {
-            return slc.slc.available();
-        }
-
         /// Adds the given item at the end of the slice.
         ///
         /// This only allocates memory when there is not enough capacity.
-        pub fn append(slc: *Self, elem: T) AllocatorError!void {
+        pub fn append(slc: *Self, elem: T) Allocator.Error!void {
             return slc.slc.append(slc.ally, elem);
+        }
+
+        /// Adds the given item at the end of the slice and returns its
+        /// pointer.
+        ///
+        /// This only allocates memory when there is not enough capacity.
+        pub fn appendAndReturn(slc: *Self, elem: T) Allocator.Error!*T {
+            return slc.slc.appendAndReturn(slc.ally, elem);
         }
 
         /// Adds the given items at the end of the slice.
         ///
         /// This only allocates memory when there is not enough capacity.
-        pub fn appendMany(slc: *Self, elems: []const T) AllocatorError!void {
+        pub fn appendMany(slc: *Self, elems: []const T) Allocator.Error!void {
             return slc.slc.appendMany(slc.ally, elems);
         }
 
@@ -661,8 +789,13 @@ pub fn SliceManaged(comptime Allocator: type, comptime T: type) type {
         pub fn appendSlices(
             slc: *Self,
             slcs: []const []const T,
-        ) AllocatorError!void {
+        ) Allocator.Error!void {
             return slc.slc.appendSlices(slc.ally, slcs);
+        }
+
+        /// Available slots to be used without memory allocations.
+        pub fn available(slc: Self) usize {
+            return slc.slc.available();
         }
 
         /// Returns number of items the slice may contain without memory
@@ -671,7 +804,9 @@ pub fn SliceManaged(comptime Allocator: type, comptime T: type) type {
             return slc.slc.cap;
         }
 
-        /// Sets the slice as empty. This doesn't deallocates memory.
+        /// Sets the slice as empty.
+        ///
+        /// This doesn't deallocate memory, use `.deinit` instead.
         pub fn clear(slc: *Self) void {
             slc.slc.clear();
         }
@@ -679,8 +814,8 @@ pub fn SliceManaged(comptime Allocator: type, comptime T: type) type {
         /// Creates a copy of the slice using the given allocator.
         pub fn clone(
             slc: Self,
-            allocator: anytype,
-        ) !SliceManaged(@TypeOf(allocator), T) {
+            allocator: Allocator,
+        ) Allocator.Error!SliceManaged(@TypeOf(allocator), T) {
             return .{
                 .ally = allocator,
                 .slc = try slc.slc.clone(allocator),
@@ -693,12 +828,12 @@ pub fn SliceManaged(comptime Allocator: type, comptime T: type) type {
         /// slice capacity. If the slice has a capacity greater than 0, the
         /// allocated size will be the maximum between `size` and the double of
         /// the slice capacity.
-        pub fn ensureCapacity(slc: *Self, size: usize) AllocatorError!void {
+        pub fn ensureCapacity(slc: *Self, size: usize) Allocator.Error!void {
             return slc.slc.ensureCapacity(slc.ally, size);
         }
 
         /// Returns the items in the slice.
-        pub fn items(slc: Self) []const T {
+        pub fn items(slc: Self) []T {
             return slc.slc.items();
         }
 
@@ -709,21 +844,67 @@ pub fn SliceManaged(comptime Allocator: type, comptime T: type) type {
 
         /// Sets the number of items in the slice to the given size.
         ///
-        /// This doesn't reduces the capacity. If `size` is greater than the
-        /// capacity, memory will be allocated.
-        pub fn resize(slc: *Self, size: usize) AllocatorError!void {
-            try slc.slc.ensureCapacity(slc.ally, size);
-
-            if (size > slc.slc.len) {
-                for (slc.slc.len..size) |i| slc.slc.ptr[i] = undefined;
-            }
-
-            slc.slc.len = size;
+        /// This doesn't reduce the capacity. If `size` is greater than the
+        /// capacity, memory will be allocated. If `size` is lower than the
+        /// capacity, extra slots will be set as `undefined`.
+        pub fn resize(slc: *Self, size: usize) Allocator.Error!void {
+            try slc.slc.resize(slc.ally, size);
         }
 
         /// Sets the slice capacity to the given size.
-        pub fn setCapacity(slc: *Self, size: usize) AllocatorError!void {
+        pub fn setCapacity(slc: *Self, size: usize) Allocator.Error!void {
             return slc.slc.setCapacity(slc.ally, size);
+        }
+    };
+}
+
+// /////////////////
+// Split iterator //
+// /////////////////
+
+/// An `iterators.Iterator` implementation for spliting slices.
+pub fn SplitIterator(comptime T: type) type {
+    return struct {
+        const Self = @This();
+
+        data: []const T,
+        sep: T,
+        done: bool = false,
+
+        fn nextIndex(it: *Self, index: usize) usize {
+            return if (findAt(T, index, it.data, it.sep)) |i|
+                i + 1
+            else
+                it.data.len;
+        }
+
+        fn getItem(it: *Self, index: usize) ?[]const T {
+            if (index >= it.data.len) {
+                if (it.done) return null;
+
+                if (it.data.len == 0 or endsWith(T, it.data, &.{it.sep})) {
+                    it.done = true;
+                    return &.{};
+                }
+
+                return null;
+            }
+
+            const j = findAt(T, index, it.data, it.sep) orelse it.data.len;
+            return it.data[index..j];
+        }
+
+        pub const Iterator = iterators.Iterator(
+            Self,
+            usize,
+            []const T,
+            null,
+            nextIndex,
+            getItem,
+        );
+
+        pub fn iterator(it: Self) Self.Iterator {
+            return .{ .ctx = it, .index = 0 };
         }
     };
 }

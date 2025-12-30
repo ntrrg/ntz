@@ -1,7 +1,7 @@
 // Copyright 2023 Miguel Angel Rivera Notararigo. All rights reserved.
 // This source code was released under the MIT license.
 
-//! An dynamic dispatch interface for writable streams.
+//! A dynamic dispatch interface for writable streams.
 
 const Self = @This();
 
@@ -11,6 +11,14 @@ vtable: *const struct {
     write: *const fn (ctx: *anyopaque, data: []const u8) anyerror!usize,
 },
 
+/// Creates a writable stream from the given implementation.
+///
+/// - `pub fn write(_: Self, data: []const u8) !usize`:
+///
+///   Must return the number of bytes processed, not the number of bytes
+///   written. For example, a compression writer should return the number of
+///   bytes it used from `data` during compression, not the resulting number of
+///   bytes after compression.
 pub fn init(writer: anytype) Self {
     const T = @TypeOf(writer);
 
@@ -30,12 +38,8 @@ pub fn init(writer: anytype) Self {
     };
 }
 
-/// Writes the given data into the writable stream.
-///
-/// Must return the number of bytes processed, not the number of bytes written.
-/// For example, a compression writer should return the number of bytes it used
-/// from `data` during compression, not the resulting number of bytes after
-/// compression.
+/// Writes the given data into the writable stream. Returns the number of
+/// processed bytes, not the number of bytes written.
 pub fn write(w: Self, data: []const u8) !usize {
     return w.vtable.write(w.ctx, data);
 }

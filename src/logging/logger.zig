@@ -11,8 +11,19 @@ const structs = types.structs;
 const logging = @import("root.zig");
 const Level = logging.Level;
 
+/// Creates a logger using the given writer as output.
+pub fn init(
+    writer: *std.Io.Writer,
+    encoder: anytype,
+    comptime Context: type,
+) Logger(@TypeOf(encoder), Context, "") {
+    return .{
+        .w = writer,
+        .e = encoder,
+    };
+}
+
 pub fn Logger(
-    comptime Writer: type,
     comptime Encoder: type,
     comptime Context: type,
     comptime scope: []const u8,
@@ -23,9 +34,9 @@ pub fn Logger(
     return struct {
         const Self = @This();
 
-        mutex: ?*std.Thread.Mutex = null,
-        writer: Writer,
-        encoder: Encoder,
+        mux: ?*std.atomic.Mutex = null,
+        w: *std.Io.Writer,
+        e: Encoder,
 
         level: Level = switch (builtin.mode) {
             .Debug => .debug,
@@ -66,16 +77,24 @@ pub fn Logger(
             else
                 ctx;
 
-            if (l.mutex) |mux| mux.lock();
-            defer if (l.mutex) |mux| mux.unlock();
-            l.encoder.encode(l.writer, val) catch return;
-            _ = l.writer.write("\n") catch return;
+            if (l.mux) |mux| {
+                while (!mux.tryLock()) {
+                    l.e.encode(l.w, val) catch return;
+                    _ = l.w.write("\n") catch return;
+                }
+
+                defer mux.unlock();
+                return;
+            }
+
+            l.e.encode(l.w, val) catch return;
+            _ = l.w.write("\n") catch return;
         }
 
         /// Like `.log` but supports string formatting.
         pub fn logf(
             l: Self,
-            allocator: anytype,
+            allocator: std.mem.Allocator,
             level: Level,
             comptime fmt: []const u8,
             args: anytype,
@@ -97,25 +116,24 @@ pub fn Logger(
         pub fn with(
             l: Self,
             comptime key: []const u8,
-            val: types.Field(Context, scope ++ key),
+            value: types.Field(Context, scope ++ key),
         ) Self {
             if (l.level == .disabled) return l;
             var _l = l;
-            types.setField(&_l.ctx, scope ++ key, val);
+            types.setField(&_l.ctx, scope ++ key, value);
             return _l;
         }
 
         /// Creates a logger using given scope.
         pub fn withScope(l: Self, comptime new_scope: []const u8) Logger(
-            Writer,
             Encoder,
             Context,
             (if (scope.len > 0) scope ++ new_scope else new_scope) ++ ".",
         ) {
             return .{
-                .mutex = l.mutex,
-                .writer = l.writer,
-                .encoder = l.encoder,
+                .mux = l.mux,
+                .w = l.w,
+                .e = l.e,
                 .level = l.level,
                 .ctx = l.ctx,
             };
@@ -140,7 +158,7 @@ pub fn Logger(
         /// Like `.debug` but supports string formatting.
         pub fn debugf(
             l: Self,
-            allocator: anytype,
+            allocator: std.mem.Allocator,
             comptime fmt: []const u8,
             args: anytype,
         ) void {
@@ -157,7 +175,7 @@ pub fn Logger(
         /// Like `.err` but supports string formatting.
         pub fn errf(
             l: Self,
-            allocator: anytype,
+            allocator: std.mem.Allocator,
             comptime fmt: []const u8,
             args: anytype,
         ) void {
@@ -176,7 +194,7 @@ pub fn Logger(
         /// Like `.fatal` but supports string formatting.
         pub fn fatalf(
             l: Self,
-            allocator: anytype,
+            allocator: std.mem.Allocator,
             exit_code: u8,
             comptime fmt: []const u8,
             args: anytype,
@@ -195,7 +213,7 @@ pub fn Logger(
         /// Like `.info` but supports string formatting.
         pub fn infof(
             l: Self,
-            allocator: anytype,
+            allocator: std.mem.Allocator,
             comptime fmt: []const u8,
             args: anytype,
         ) void {
@@ -212,7 +230,7 @@ pub fn Logger(
         /// Like `.warn but supports string formatting.
         pub fn warnf(
             l: Self,
-            allocator: anytype,
+            allocator: std.mem.Allocator,
             comptime fmt: []const u8,
             args: anytype,
         ) void {

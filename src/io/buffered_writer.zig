@@ -1,42 +1,29 @@
 // Copyright 2023 Miguel Angel Rivera Notararigo. All rights reserved.
 // This source code was released under the MIT license.
 
-const io = @import("root.zig");
+const io_utils = @import("root.zig");
 const types = @import("../types/root.zig");
 const bytes = types.bytes;
-const errors = types.errors;
 
 /// Creates a writer that actually writes once its buffer has been filled.
-pub fn init(writer: anytype) BufferedWriter(@TypeOf(writer), 4096) {
-    return .{ .w = writer };
-}
-
-/// Creates a buffered writer with a specific size.
-pub fn initWithSize(writer: anytype, comptime size: usize) BufferedWriter(
-    @TypeOf(writer),
-    size,
-) {
-    return .{ .w = writer };
+pub fn init(writer: anytype, buf: []u8) BufferedWriter(@TypeOf(writer)) {
+    return .{ .w = writer, .buf = buf };
 }
 
 /// A writer that actually writes once its buffer has been filled.
-pub fn BufferedWriter(
-    comptime Writer: type,
-    comptime size: usize,
-) type {
+pub fn BufferedWriter(comptime Writer: type) type {
     return struct {
         const Self = @This();
 
-        pub const Error = WriterError;
-        pub const WriterError = errors.From(Writer);
+        pub const Error = Writer.Error;
 
         w: Writer,
-        buf: [size]u8 = undefined,
+        buf: []u8 = undefined,
         end: usize = 0,
 
         /// Writes any buffered bytes to the underlying writer and restores the
         /// buffer to its full capacity.
-        pub fn flush(bw: *Self) WriterError!void {
+        pub fn flush(bw: *Self) Error!void {
             if (bw.end == 0) return;
             _ = try bw.w.write(bw.buf[0..bw.end]);
             bw.end = 0;
@@ -45,20 +32,20 @@ pub fn BufferedWriter(
         /// Writes bytes into a buffer until it is full.
         ///
         /// Use the `.flush` method for writing remaining bytes.
-        pub fn write(bw: *Self, data: []const u8) WriterError!usize {
+        pub fn write(bw: *Self, data: []const u8) Error!usize {
             var i: usize = 0;
 
             while (i < data.len) {
                 const n = bytes.copy(bw.buf[bw.end..], data[i..]);
                 bw.end += n;
-                if (bw.end == size) try bw.flush();
+                if (bw.end == bw.buf.len) try bw.flush();
                 i += n;
             }
 
             return data.len;
         }
 
-        pub fn writer(dw: *Self) io.Writer(*Self, WriterError, write) {
+        pub fn writer(dw: *Self) io_utils.Writer(*Self, Error, write) {
             return .{ .writer = dw };
         }
     };
