@@ -46,10 +46,8 @@ pub fn clone(
 ) std.mem.Allocator.Error!Self {
     var new_opts = opts;
 
-    new_opts.log.file = if (opts.log.file.len > 0)
-        try allocator.dupe(u8, opts.log.file)
-    else
-        "";
+    if (opts.log.file.len > 0)
+        new_opts.log.file = try allocator.dupe(u8, opts.log.file);
 
     return new_opts;
 }

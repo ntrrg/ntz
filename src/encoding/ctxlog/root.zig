@@ -224,12 +224,12 @@ pub const Encoder = struct {
 
         var should_space = false;
 
-        inline for (ti.fields) |field| {
+        inline for (ti.field_names, ti.field_types) |field_name, field_type| {
             blk: {
-                if (e.shouldOmit(@field(value, field.name))) break :blk;
+                if (e.shouldOmit(@field(value, field_name))) break :blk;
                 if (should_space) try writer.writeAll(" ");
-                const field_val = @field(value, field.name);
-                try e.encodeStructField(writer, field, field_val);
+                const field_val = @field(value, field_name);
+                try e.encodeStructField(writer, field_name, field_type, field_val);
                 should_space = true;
             }
         }
@@ -238,12 +238,13 @@ pub const Encoder = struct {
     pub fn encodeStructField(
         e: Self,
         writer: *std.Io.Writer,
-        field: std.builtin.Type.StructField,
+        field_name: []const u8,
+        field_type: type,
         value: anytype,
     ) (Error || std.Io.Writer.Error)!void {
-        const _e = try e.withField(field.name);
+        const _e = try e.withField(field_name);
 
-        if (comptime funcs.hasFn(field.type, "asCtxlog")) {
+        if (comptime funcs.hasFn(field_type, "asCtxlog")) {
             try value.asCtxlog(writer, _e);
             return;
         }
@@ -276,12 +277,12 @@ pub const Encoder = struct {
 
         const Tag = ti.tag_type.?;
 
-        inline for (ti.fields) |field| {
-            if (value == @field(Tag, field.name)) {
-                const field_val = @field(value, field.name);
+        inline for (ti.field_names, ti.field_types) |field_name, field_type| {
+            if (value == @field(Tag, field_name)) {
+                const field_val = @field(value, field_name);
 
-                if (field.type == void) {
-                    try e.encodeString(writer, field.name);
+                if (field_type == void) {
+                    try e.encodeString(writer, field_name);
                 } else {
                     try e.encode(writer, field_val);
                 }
@@ -343,9 +344,9 @@ pub const Encoder = struct {
 
             .@"union" => |child_ti| {
                 if (child_ti.tag_type) |Tag| {
-                    inline for (child_ti.fields) |u_field| {
-                        if (value == @field(Tag, u_field.name)) {
-                            if (@typeInfo(u_field.type) == .@"struct")
+                    inline for (child_ti.field_names, child_ti.field_types) |u_field_name, u_field_type| {
+                        if (value == @field(Tag, u_field_name)) {
+                            if (@typeInfo(u_field_type) == .@"struct")
                                 return false;
                         }
                     }

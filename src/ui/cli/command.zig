@@ -61,7 +61,7 @@ pub fn Command(comptime Context: type) type {
             entries: []const cli.Entry,
         ) !void {
             for (cmd.opts.items()) |opt| {
-                if (cmd.status.isDone()) return error.Cancelled;
+                if (cmd.status.isDone()) return error.Canceled;
 
                 opt.load(arena, cmd, ctx, entries) catch |err| {
                     const msg = "cannot load option '{s}'";
@@ -73,7 +73,7 @@ pub fn Command(comptime Context: type) type {
             var args: slices.Slice([]const u8) = .{};
 
             for (entries) |entry| {
-                if (cmd.status.isDone()) return error.Cancelled;
+                if (cmd.status.isDone()) return error.Canceled;
 
                 if (entry.kind == .argument) {
                     try args.append(arena, entry.value);

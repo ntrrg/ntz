@@ -37,7 +37,7 @@ pub fn Logger(
     return struct {
         const Self = @This();
 
-        mux: ?*std.atomic.Mutex = null,
+        mux: ?*std.Io.Mutex = null,
         w: *std.Io.Writer,
         e: Encoder,
 
@@ -81,12 +81,11 @@ pub fn Logger(
                 ctx;
 
             if (l.mux) |mux| {
-                while (!mux.tryLock()) {
-                    defer mux.unlock();
-                    l.e.encode(l.w, val) catch return;
-                    l.w.writeAll("\n") catch return;
-                }
+                std.Io.Threaded.mutexLock(mux) catch return;
+                defer std.Io.Threaded.mutexUnlock(mux);
 
+                l.e.encode(l.w, val) catch return;
+                l.w.writeAll("\n") catch return;
                 return;
             }
 
@@ -102,7 +101,7 @@ pub fn Logger(
             comptime fmt: []const u8,
             args: anytype,
         ) void {
-            const msg = std.fmt.allocPrint(allocator, fmt, args) catch return;
+            const msg = allocator.print(fmt, args) catch return;
             defer allocator.free(msg);
             l.log(level, msg);
         }
@@ -117,7 +116,7 @@ pub fn Logger(
         /// Checks if given level should be logged.
         pub fn should(l: Self, level: Level) bool {
             if (l.level == .disabled) return false;
-            return @intFromEnum(level) >= @intFromEnum(l.level);
+            return @backingInt(level) >= @backingInt(l.level);
         }
 
         /// Updates the context of the logger.

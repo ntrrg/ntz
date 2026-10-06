@@ -39,9 +39,9 @@ pub fn of(comptime ErrorSet: type, err: anyerror) bool {
 
     const err_name = @errorName(err);
 
-    if (set_ti.error_set) |set| {
+    if (set_ti.error_set.error_names) |set| {
         for (set) |_err|
-            if (bytes.equal(err_name, _err.name)) return true;
+            if (bytes.equal(err_name, _err)) return true;
     } else {
         return true;
     }

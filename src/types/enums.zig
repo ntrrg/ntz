@@ -7,14 +7,14 @@
 
 /// Returns the enum member at the given index.
 pub fn at(comptime T: type, comptime i: usize) T {
-    const fields = @typeInfo(T).@"enum".fields;
-    return @enumFromInt(fields[i].value);
+    const values = @typeInfo(T).@"enum".field_values;
+    return @fromBackingInt(values[i]);
 }
 
 /// Returns the bigger enum member.
 pub fn max(comptime T: type) T {
-    const fields = @typeInfo(T).@"enum".fields;
-    return @enumFromInt(fields[fields.len - 1].value);
+    const values = @typeInfo(T).@"enum".field_values;
+    return @fromBackingInt(values[values.len - 1]);
 }
 
 /// Returns the smaller enum member.

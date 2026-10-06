@@ -650,6 +650,7 @@ pub fn Slice(comptime T: type) type {
 
             if (slc.cap > 0 and allocator.resize(slc.ptr[0..slc.cap], size)) {
                 slc.cap = size;
+                if (slc.len > size) slc.len = size;
                 return;
             }
 

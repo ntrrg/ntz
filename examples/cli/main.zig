@@ -15,45 +15,8 @@ pub var global_status = ntz.Status{ .io = std.Options.debug_io };
 pub const global_log = logging.init();
 
 pub fn main(init: std.process.Init) !u8 {
-    // /////////////
-    // OS Signals //
-    // /////////////
-
-    var sa: std.posix.Sigaction = .{
-        .handler = .{ .sigaction = signalHandler },
-        .mask = std.posix.sigemptyset(),
-        .flags = std.posix.SA.RESTART,
-    };
-
-    std.posix.sigaction(std.posix.SIG.INT, &sa, null);
-    std.posix.sigaction(std.posix.SIG.TERM, &sa, null);
-
-    // /////
-    // IO //
-    // /////
-
     const io = init.io;
-
-    // ////////////
-    // Allocator //
-    // ////////////
-
     const allocator = init.gpa;
-    //var allocator: std.mem.Allocator = undefined;
-
-    //var debug_allocator: std.heap.DebugAllocator(.{}) = .init;
-
-    //defer {
-    //    if (debug_allocator.deinit() != .ok)
-    //        debug_log.warn("memory leaked");
-    //}
-
-    //allocator = switch (builtin.mode) {
-    //    .Debug, .ReleaseSafe => debug_allocator.allocator(),
-    //    .ReleaseFast, .ReleaseSmall => std.heap.smp_allocator,
-    //};
-
-    //if (builtin.os.tag == .wasi) allocator = std.heap.wasm_allocator;
 
     // ////////////////////
     // State propagation //
@@ -68,6 +31,19 @@ pub fn main(init: std.process.Init) !u8 {
     };
 
     defer global_status.deinit(allocator);
+
+    // /////////////
+    // OS Signals //
+    // /////////////
+
+    var sa: std.posix.Sigaction = .{
+        .handler = .{ .sigaction = signalHandler },
+        .mask = std.posix.sigemptyset(),
+        .flags = std.posix.SA.RESTART,
+    };
+
+    std.posix.sigaction(std.posix.SIG.INT, &sa, null);
+    std.posix.sigaction(std.posix.SIG.TERM, &sa, null);
 
     // //////
     // CLI //
@@ -139,12 +115,16 @@ pub fn main(init: std.process.Init) !u8 {
     };
 
     var log_file_writer = log_file.writer(io, &.{});
+    defer log_file_writer.flush() catch {};
 
     log_file_writer.seekTo(log_file_size) catch |err| {
         const msg = "cannot go to the end of the log file";
         global_log.withError(err).err(msg);
         return err;
     };
+
+    //var log_writer = &log_file_writer.interface;
+    //_ = &log_writer;
 
     var log_writer_ln = io_utils.delimitedWriter(
         &log_file_writer.interface,
@@ -161,7 +141,7 @@ pub fn main(init: std.process.Init) !u8 {
 
     // Mutex //
 
-    var log_mutex: std.atomic.Mutex = .unlocked;
+    var log_mutex: std.Io.Mutex = .init;
 
     // Encoder //
 
@@ -213,7 +193,7 @@ fn signalHandler(
 ) callconv(.c) void {
     switch (sig) {
         std.posix.SIG.INT, std.posix.SIG.TERM => {
-            const exit_code: u8 = 128 +| @as(u8, @intCast(@intFromEnum(sig)));
+            const exit_code: u8 = 128 +| @as(u8, @intCast(@backingInt(sig)));
 
             if (global_status.isDone()) {
                 std.process.exit(exit_code);

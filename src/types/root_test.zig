@@ -89,17 +89,6 @@ test "ntz.types.Field" {
     try testing.expectEqual(?Point, types.Field(MaybeTriangle, "a.b"));
 }
 
-// Fields //
-
-test "ntz.types.Fields" {
-    try testing.expectEqual(std.builtin.Type.StructField, types.Fields(Triangle));
-    try testing.expectEqual(std.builtin.Type.StructField, types.Fields(*Triangle));
-    try testing.expectEqual(std.builtin.Type.StructField, types.Fields(?Triangle));
-    try testing.expectEqual(std.builtin.Type.UnionField, types.Fields(Figure));
-    try testing.expectEqual(std.builtin.Type.UnionField, types.Fields(*Figure));
-    try testing.expectEqual(std.builtin.Type.UnionField, types.Fields(?Figure));
-}
-
 // field //
 
 test "ntz.types.field" {
@@ -143,13 +132,13 @@ test "ntz.types.field" {
 // fields //
 
 test "ntz.types.fields" {
-    try testing.expectEqual(3, comptime types.fields(Triangle).len);
-    try testing.expectEqual(3, comptime types.fields(Line).len);
-    try testing.expectEqual(2, comptime types.fields(*Point).len);
-    try testing.expectEqual(2, comptime types.fields(?Point).len);
-    try testing.expectEqual(2, comptime types.fields(Figure).len);
-    try testing.expectEqual(2, comptime types.fields(*Figure).len);
-    try testing.expectEqual(2, comptime types.fields(?Figure).len);
+    try testing.expectEqual(3, comptime types.fields(Triangle).names.len);
+    try testing.expectEqual(3, comptime types.fields(Line).names.len);
+    try testing.expectEqual(2, comptime types.fields(*Point).names.len);
+    try testing.expectEqual(2, comptime types.fields(?Point).names.len);
+    try testing.expectEqual(2, comptime types.fields(Figure).names.len);
+    try testing.expectEqual(2, comptime types.fields(*Figure).names.len);
+    try testing.expectEqual(2, comptime types.fields(?Figure).names.len);
 }
 
 // setField //

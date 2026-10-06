@@ -297,7 +297,7 @@ test "ntz.encoding.ctxlog" {
 
     // Void.
 
-    try e.encode(w, void{});
+    try e.encode(w, {});
     try testing.expectEqualStrings("null", buf.bytes());
     buf.clear();
 

@@ -37,19 +37,21 @@ pub fn Child(comptime T: type) type {
     };
 }
 
-/// Returns the type of the given field. `fp` may be a field name or a field
-/// path.
+/// Returns the type of the given field.
 ///
-/// A field path is a list of fields separated by periods (`.`). All elements
-/// in the field path must be structs or unions, except for the last one.
+/// `fp` may be a field name or a field path. A field path is a list of fields
+/// separated by periods (`.`). All elements in the field path must be structs
+/// or unions, except for the last one.
 pub fn Field(comptime T: type, comptime fp: []const u8) type {
     var field_T = T;
     var field_name, var rest = bytes.split(fp, '.');
 
     loop: while (true) {
-        for (fields(field_T)) |f| {
-            if (!bytes.equal(f.name, field_name)) continue;
-            field_T = f.type;
+        const _fields = fields(field_T);
+
+        for (_fields.names, _fields.types) |f_name, f_type| {
+            if (!bytes.equal(f_name, field_name)) continue;
+            field_T = f_type;
             if (rest.len == 0) break :loop;
             field_name, rest = bytes.split(rest, '.');
             break;
@@ -61,31 +63,36 @@ pub fn Field(comptime T: type, comptime fp: []const u8) type {
     return field_T;
 }
 
+pub const Fields = struct {
+    names: []const []const u8,
+    types: []const type,
+};
+
 /// Returns the type of fields `T` contains. If `T` is a single pointer to a
-/// sctruct or a union, this will use its child type.
-pub fn Fields(comptime T: type) type {
-    return sw: switch (@typeInfo(T)) {
-        .@"struct" => std.builtin.Type.StructField,
-        .@"union" => std.builtin.Type.UnionField,
+/// struct or a union, this will use its child type.
+//pub fn Fields(comptime T: type) type {
+//    return sw: switch (@typeInfo(T)) {
+//        .@"struct" => std.builtin.Type.StructField,
+//        .@"union" => std.builtin.Type.UnionField,
+//
+//        .pointer => |ti| switch (ti.size) {
+//            .one => continue :sw @typeInfo(ti.child),
+//            else => @compileError(@typeName(T) ++ " doesn't have fields"),
+//        },
+//
+//        .optional => |ti| continue :sw @typeInfo(ti.child),
+//        else => @compileError(@typeName(T) ++ " doesn't have fields"),
+//    };
+//}
 
-        .pointer => |ti| switch (ti.size) {
-            .one => continue :sw @typeInfo(ti.child),
-            else => @compileError(@typeName(T) ++ " doesn't have fields"),
-        },
-
-        .optional => |ti| continue :sw @typeInfo(ti.child),
-        else => @compileError(@typeName(T) ++ " doesn't have fields"),
-    };
-}
-
-/// Returns the value of a field in `val`. `fp` may be a field name or a field
-/// path.
+/// Returns the value of a field in `val`.
 ///
 /// This is equivalent to `x.a` or `x.a.b`, but it can be done
 /// programmatically.
 ///
-/// A field path is a list of fields separated by periods (`.`). All elements
-/// in the field path must be structs or unions, except for the last one.
+/// `fp` may be a field name or a field path. A field path is a list of fields
+/// separated by periods (`.`). All elements in the field path must be structs
+/// or unions, except for the last one.
 pub fn field(value: anytype, comptime fp: []const u8) Field(@TypeOf(value), fp) {
     const T = @TypeOf(value);
     const ti = @typeInfo(T);
@@ -99,12 +106,16 @@ pub fn field(value: anytype, comptime fp: []const u8) Field(@TypeOf(value), fp) 
     return field(field_val, rest);
 }
 
-/// Returns the list of fields on `T`. If `T` is a single pointer to a sctruct
-/// or a union, this will use its child type.
-pub fn fields(comptime T: type) []const Fields(T) {
+/// Returns the list of fields on `T`.
+///
+/// If `T` is a single pointer to a struct or a union, this will use its child
+/// type.
+pub fn fields(comptime T: type) Fields {
+    if (!has_fields(T)) @compileError(@typeName(T) ++ " doesn't have fields");
+
     return sw: switch (@typeInfo(T)) {
-        .@"struct" => |ti| ti.fields,
-        .@"union" => |ti| ti.fields,
+        .@"struct" => |ti| .{ .names = ti.field_names, .types = ti.field_types },
+        .@"union" => |ti| .{ .names = ti.field_names, .types = ti.field_types },
 
         .pointer => |ti| switch (ti.size) {
             .one => continue :sw @typeInfo(ti.child),
@@ -116,14 +127,33 @@ pub fn fields(comptime T: type) []const Fields(T) {
     };
 }
 
-/// Sets the value of a field in `orig` to `val`. `fp` may be a field name or a
-/// field path.
+/// Checks if `T` has fields.
+///
+/// If `T` is a single pointer to a struct or a union, this will use its child
+/// type.
+pub fn has_fields(comptime T: type) bool {
+    return sw: switch (@typeInfo(T)) {
+        .@"struct" => true,
+        .@"union" => true,
+
+        .pointer => |ti| switch (ti.size) {
+            .one => continue :sw @typeInfo(ti.child),
+            else => false,
+        },
+
+        .optional => |ti| continue :sw @typeInfo(ti.child),
+        else => false,
+    };
+}
+
+/// Sets the value of a field in `orig` to `val`.
 ///
 /// This is equivalent to `x.a = val` or `x.a.b = val`, but it can be done
 /// programmatically.
 ///
-/// A field path is a list of fields separated by periods (`.`). All elements
-/// in the field path must be structs or unions, except for the last one.
+/// `fp` may be a field name or a field path. A field path is a list of fields
+/// separated by periods (`.`). All elements in the field path must be structs
+/// or unions, except for the last one.
 pub fn setField(
     orig: anytype,
     comptime fp: []const u8,

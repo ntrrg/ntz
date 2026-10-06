@@ -227,7 +227,7 @@ pub fn build(b: *std.Build) void {
 
         const run_step = b.step("run", "Build and run the given example");
         const run = b.addRunArtifact(exe);
-        if (b.args) |args| run.addArgs(args);
+        run.addPassthruArgs();
 
         run.step.dependOn(b.getInstallStep());
         run_step.dependOn(&run.step);
@@ -287,7 +287,7 @@ pub fn build(b: *std.Build) void {
             test_coverage_out,
         });
 
-        coverage_cmd.addArtifactArg(test_exe);
+        coverage_cmd.addArtifactArg2(test_exe, .{});
         coverage_cmd.has_side_effects = true;
 
         test_step.dependOn(&coverage_cmd.step);
@@ -299,12 +299,12 @@ pub fn build(b: *std.Build) void {
 
     const fmt_step = b.step("fmt", "Format source code");
 
-    const zig_fmt = b.addFmt(.{ .paths = &.{
+    const zig_fmt = b.addFmt(.{ .paths = b.pathList(&.{
         "build.zig.zon",
         "build.zig",
         "src",
         "examples",
-    } });
+    }) });
 
     fmt_step.dependOn(&zig_fmt.step);
 

@@ -14,6 +14,8 @@ const slices = types.slices;
 
 const Self = @This();
 
+pub const Error = error{Canceled};
+
 parent: ?*const Self = null,
 io: std.Io,
 status: std.Io.Event = .unset,
