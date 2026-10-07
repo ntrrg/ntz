@@ -8,7 +8,7 @@ const ntz = @import("ntz");
 const unicode = ntz.encoding.unicode;
 
 test "ntz.encoding.unicode" {
-    _ = @import("utf8_test.zig");
+    _ = @import("utf8.zig");
 }
 
 // ////////////

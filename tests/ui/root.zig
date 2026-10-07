@@ -9,5 +9,5 @@ const ntz = @import("ntz");
 const ui = ntz.ui;
 
 test "ntz.ui" {
-    _ = @import("cli/root_test.zig");
+    _ = @import("cli/root.zig");
 }

@@ -12,11 +12,9 @@ on:
       - main
 jobs:
   ci:
-    name: Integration
+    name: Continuos Integration
     strategy:
       matrix:
-        os:
-          - ubuntu-latest
         target:
           - aarch64-linux
           - aarch64-macos
@@ -27,23 +25,29 @@ jobs:
           - ReleaseSmall
           - ReleaseFast
           - ReleaseSafe
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     steps:
-      - name: Set up Zig
+      - name: Setup Zig
         uses: mlugg/setup-zig@v2
         with:
           version: '0.17.0'
 
       - name: Get source code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Lint
-        run: zig fmt --check --ast-check build.zig.zon build.zig src examples
+        run: zig fmt --check --ast-check build.zig.zon build.zig examples src tests
 
       - name: Build (${{ matrix.target }}-${{ matrix.optimize }})
-        if: matrix.os == 'ubuntu-latest'
         run: |
-          zig build -Dtarget=${{ matrix.target }} -Doptimize=${{ matrix.optimize }}
+          case "${{ matrix.target }}" in
+            *-macos)
+              zig build -Ddynamic -Dtarget=${{ matrix.target }} -Doptimize=${{ matrix.optimize }} --prefix zig-out/${{ matrix.target }}-${{ matrix.optimize }}/ntz
+              ;;
+            *)
+              zig build -Dtarget=${{ matrix.target }} -Doptimize=${{ matrix.optimize }} --prefix zig-out/${{ matrix.target }}-${{ matrix.optimize }}/ntz
+              ;;
+            esac
 
-      - name: Tests
-        run: zig build --summary all test
+      - name: Tests (${{ matrix.optimize }})
+        run: zig build -Doptimize=${{ matrix.optimize }} --summary all test

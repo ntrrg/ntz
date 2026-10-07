@@ -36,14 +36,16 @@ pub fn main(init: std.process.Init) !u8 {
     // OS Signals //
     // /////////////
 
-    var sa: std.posix.Sigaction = .{
-        .handler = .{ .sigaction = signalHandler },
-        .mask = std.posix.sigemptyset(),
-        .flags = std.posix.SA.RESTART,
-    };
+    if (comptime builtin.target.os.tag != .windows) {
+        var sa: std.posix.Sigaction = .{
+            .handler = .{ .sigaction = signalHandler },
+            .mask = std.posix.sigemptyset(),
+            .flags = std.posix.SA.RESTART,
+        };
 
-    std.posix.sigaction(std.posix.SIG.INT, &sa, null);
-    std.posix.sigaction(std.posix.SIG.TERM, &sa, null);
+        std.posix.sigaction(std.posix.SIG.INT, &sa, null);
+        std.posix.sigaction(std.posix.SIG.TERM, &sa, null);
+    }
 
     // //////
     // CLI //

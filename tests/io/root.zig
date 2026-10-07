@@ -13,15 +13,15 @@ const io_utils = ntz.io;
 
 test "ntz.io" {
     // Readers.
-    //_ = @import("counting_reader_test.zig");
+    //_ = @import("counting_reader.zig");
 
     // Writers.
-    //_ = @import("DynWriter_test.zig");
-    _ = @import("writer_test.zig");
-    _ = @import("buffered_writer_test.zig");
-    _ = @import("counting_writer_test.zig");
-    _ = @import("delimited_writer_test.zig");
-    _ = @import("limited_writer_test.zig");
+    //_ = @import("DynWriter.zig");
+    _ = @import("writer.zig");
+    _ = @import("buffered_writer.zig");
+    _ = @import("counting_writer.zig");
+    _ = @import("delimited_writer.zig");
+    _ = @import("limited_writer.zig");
 }
 
 // //////////

@@ -8,14 +8,14 @@ const ntz = @import("ntz");
 const types = ntz.types;
 
 test "ntz.types" {
-    _ = @import("bytes_test.zig");
-    _ = @import("enums_test.zig");
-    _ = @import("errors_test.zig");
-    _ = @import("funcs_test.zig");
-    _ = @import("iterators_test.zig");
-    _ = @import("slices_test.zig");
-    //_ = @import("strings_test.zig");
-    _ = @import("structs_test.zig");
+    _ = @import("bytes.zig");
+    _ = @import("enums.zig");
+    _ = @import("errors.zig");
+    _ = @import("funcs.zig");
+    _ = @import("iterators.zig");
+    _ = @import("slices.zig");
+    //_ = @import("strings.zig");
+    _ = @import("structs.zig");
 }
 
 const Point = struct {

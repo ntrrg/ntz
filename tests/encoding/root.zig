@@ -2,6 +2,6 @@
 // This source code was released under the MIT license.
 
 test "ntz.encoding" {
-    _ = @import("ctxlog/root_test.zig");
-    _ = @import("unicode/root_test.zig");
+    _ = @import("ctxlog/root.zig");
+    _ = @import("unicode/root.zig");
 }

@@ -8,7 +8,7 @@ const ntz = @import("ntz");
 const logging = ntz.logging;
 
 test "ntz.logging" {
-    _ = @import("logger_test.zig");
+    _ = @import("logger.zig");
 }
 
 test "ntz.logging.Level.key" {
