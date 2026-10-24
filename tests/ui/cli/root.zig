@@ -42,7 +42,22 @@ test "ntz.os.cli" {
     var opts = Options{};
     var entries: cli.Entries = .{};
 
-    cmd.fromEnvString(arena, &opts, &entries, "LOG_LEVEL=\"error\"") catch |err| {
+    cmd.fromConfigIniBytes(
+        arena,
+        &opts,
+        &entries,
+        \\[log]
+        \\level=warning
+        \\
+        \\[calc]
+        \\operation=div
+        ,
+    ) catch |err| {
+        std.debug.print("{s}\n", .{log_buf.bytes()});
+        return err;
+    };
+
+    cmd.fromEnvBytes(arena, &opts, &entries, "LOG_LEVEL=\"error\"") catch |err| {
         std.debug.print("{s}\n", .{log_buf.bytes()});
         return err;
     };
@@ -55,6 +70,8 @@ test "ntz.os.cli" {
     };
 
     const entries_want: []const cli.Entry = &.{
+        .{ .kind = .config, .command = "numbers", .key = "log.level", .value = "warning" },
+        .{ .kind = .config, .command = "calc", .key = "operation", .value = "div" },
         .{ .kind = .env, .command = "numbers", .key = "LOG_LEVEL", .value = "error" },
         .{ .kind = .flag, .command = "numbers", .key = "--log-file", .value = "log.ctxlog" },
         .{ .kind = .argument, .command = "numbers", .key = "", .value = "numbers" },
@@ -62,8 +79,11 @@ test "ntz.os.cli" {
 
     try testing.expectEqual(entries_want.len, entries.len);
 
-    for (entries.items(), entries_want) |got, want| {
-        try testing.expectEqualDeep(want, got);
+    for (entries_want, entries.items()) |want, got| {
+        try testing.expectEqual(want.kind, got.kind);
+        try testing.expectEqualStrings(want.command, got.command);
+        try testing.expectEqualStrings(want.key, got.key);
+        try testing.expectEqualStrings(want.value, got.value);
     }
 
     cmd.load(arena, &opts, entries.items()) catch |err| {
@@ -154,8 +174,12 @@ const Options = struct {
             .action = Self.cliMain,
         };
 
+        try cmd.addOption(Command.helpOption);
+        try cmd.addOption(Command.versionOption);
+        try cmd.addOption(Command.envFileOption);
+
         try cmd.addOption(.{
-            .id = "log_file",
+            .id = "log.file",
             .flags = &.{"--log-file"},
             .env = "LOG_FILE",
             .help = "Use given file as log file",
@@ -164,7 +188,7 @@ const Options = struct {
         });
 
         try cmd.addOption(.{
-            .id = "log_level",
+            .id = "log.level",
             .flags = &.{"--log-level"},
             .env = "LOG_LEVEL",
             .help = "Minimum severity for log records",
@@ -173,14 +197,10 @@ const Options = struct {
             .action = cliLogLevel,
         });
 
-        try cmd.addOption(Command.envFileOption);
-        try cmd.addOption(Command.helpOption);
-        try cmd.addOption(Command.versionOption);
-
         // calc subcommand //
 
         var cmdCalc = try cmd.addCommand(
-            cmd_id ++ ".calc",
+            "calc",
             "calc",
             &.{ "c", "clc" },
             cliMain,
@@ -188,6 +208,8 @@ const Options = struct {
 
         cmdCalc.description = "Do some math operations on the given range instead of just printing them";
         cmdCalc.env_prefix = "CALC_";
+
+        try cmdCalc.addOption(Command.helpOption);
 
         try cmdCalc.addOption(.{
             .id = "first",
@@ -235,8 +257,6 @@ const Options = struct {
             .action = cliOperation,
         });
 
-        try cmdCalc.addOption(Command.helpOption);
-
         return cmd;
     }
 
@@ -248,17 +268,17 @@ const Options = struct {
     ) !void {
         switch (args.len) {
             0...1 => {},
-            2 => try opts.cliLast(arena, cmd, args[1]),
+            2 => try opts.cliLast(arena, cmd, .init(args[1])),
 
             3 => {
-                try opts.cliFirst(arena, cmd, args[1]);
-                try opts.cliLast(arena, cmd, args[2]);
+                try opts.cliFirst(arena, cmd, .init(args[1]));
+                try opts.cliLast(arena, cmd, .init(args[2]));
             },
 
             4 => {
-                try opts.cliFirst(arena, cmd, args[1]);
-                try opts.cliLast(arena, cmd, args[2]);
-                try opts.cliInterval(arena, cmd, args[3]);
+                try opts.cliFirst(arena, cmd, .init(args[1]));
+                try opts.cliLast(arena, cmd, .init(args[2]));
+                try opts.cliInterval(arena, cmd, .init(args[3]));
             },
 
             else => {
@@ -271,8 +291,10 @@ const Options = struct {
         opts: *Self,
         arena: std.mem.Allocator,
         cmd: Command,
-        value: []const u8,
+        entry: cli.Entry,
     ) !void {
+        const value = entry.value;
+
         if (value.len == 0) {
             cmd.log.err("no first number given");
             return error.MissingValue;
@@ -297,8 +319,10 @@ const Options = struct {
         opts: *Self,
         arena: std.mem.Allocator,
         cmd: Command,
-        value: []const u8,
+        entry: cli.Entry,
     ) !void {
+        const value = entry.value;
+
         if (value.len == 0) {
             cmd.log.err("no last number given");
             return error.MissingValue;
@@ -323,8 +347,10 @@ const Options = struct {
         opts: *Self,
         arena: std.mem.Allocator,
         cmd: Command,
-        value: []const u8,
+        entry: cli.Entry,
     ) !void {
+        const value = entry.value;
+
         if (value.len == 0) {
             cmd.log.err("no interval given");
             return error.MissingValue;
@@ -349,8 +375,10 @@ const Options = struct {
         opts: *Self,
         _: std.mem.Allocator,
         cmd: Command,
-        value: []const u8,
+        entry: cli.Entry,
     ) !void {
+        const value = entry.value;
+
         if (value.len == 0) {
             cmd.log.err("no operation given");
             return error.MissingValue;
@@ -374,8 +402,10 @@ const Options = struct {
         opts: *Self,
         _: std.mem.Allocator,
         _: Command,
-        value: []const u8,
+        entry: cli.Entry,
     ) !void {
+        const value = entry.value;
+
         if (value.len == 0) return;
         opts.log.file = value;
     }
@@ -384,8 +414,10 @@ const Options = struct {
         opts: *Self,
         arena: std.mem.Allocator,
         cmd: Command,
-        value: []const u8,
+        entry: cli.Entry,
     ) !void {
+        const value = entry.value;
+
         if (value.len == 0) {
             cmd.log.err("no log severity given");
             return error.EmptyValue;

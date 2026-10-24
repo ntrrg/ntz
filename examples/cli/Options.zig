@@ -93,8 +93,13 @@ pub fn command(
         .action = Self.cliMain,
     };
 
+    try cmd.addOption(Command.helpOption);
+    try cmd.addOption(Command.versionOption);
+    try cmd.addOption(Command.genConfigOption);
+    try cmd.addOption(Command.envFileOption);
+
     try cmd.addOption(.{
-        .id = "log_file",
+        .id = "log.file",
         .flags = &.{"--log-file"},
         .env = "LOG_FILE",
         .help = "Use given file as log file",
@@ -103,7 +108,7 @@ pub fn command(
     });
 
     try cmd.addOption(.{
-        .id = "log_format",
+        .id = "log.format",
         .flags = &.{"--log-format"},
         .env = "LOG_FORMAT",
         .help = "Use given format as log encoding format",
@@ -114,7 +119,7 @@ pub fn command(
     });
 
     try cmd.addOption(.{
-        .id = "log_level",
+        .id = "log.level",
         .flags = &.{"--log-level"},
         .env = "LOG_LEVEL",
         .help = "Minimum severity for log records",
@@ -123,14 +128,10 @@ pub fn command(
         .action = cliLogLevel,
     });
 
-    try cmd.addOption(Command.envFileOption);
-    try cmd.addOption(Command.helpOption);
-    try cmd.addOption(Command.versionOption);
-
     // codepoint subcommand //
 
     var cmdSub = try cmd.addCommand(
-        build_options.name ++ ".codepoint",
+        "codepoint",
         "codepoint",
         &.{ "c", "cp" },
         Self.cliCodepoint,
@@ -139,12 +140,15 @@ pub fn command(
     cmdSub.description = "Sub command example";
     cmdSub.env_prefix = "CODEPOINT_";
 
+    try cmdSub.addOption(Command.helpOption);
+
     try cmdSub.addOption(.{
         .id = "first_codepoint",
         .flags = &.{ "-f", "--first-cp" },
         .env = "FIRST",
         .help = "First codepoint",
         .placeholder = "codepoint",
+        .default = "0x20",
         .action = cliCodepointFirst,
     });
 
@@ -154,11 +158,10 @@ pub fn command(
         .env = "LAST",
         .help = "Last codepoint",
         .placeholder = "codepoint",
+        .default = "0x10FFFF",
         .is_required = true,
         .action = cliCodepointLast,
     });
-
-    try cmdSub.addOption(Command.helpOption);
 
     return cmd;
 }
@@ -173,11 +176,11 @@ fn cliMain(
 
     switch (args.len) {
         0...1 => {},
-        2 => try opts.cliCodepointLast(arena, cmd, args[1]),
+        2 => try opts.cliCodepointLast(arena, cmd, .init(args[1])),
 
         else => {
-            try opts.cliCodepointFirst(arena, cmd, args[1]);
-            try opts.cliCodepointLast(arena, cmd, args[2]);
+            try opts.cliCodepointFirst(arena, cmd, .init(args[1]));
+            try opts.cliCodepointLast(arena, cmd, .init(args[2]));
         },
     }
 }
@@ -195,8 +198,10 @@ fn cliCodepointFirst(
     opts: *Self,
     arena: std.mem.Allocator,
     cmd: Command,
-    value: []const u8,
+    entry: cli.Entry,
 ) !void {
+    const value = entry.value;
+
     if (value.len == 0) {
         cmd.log.err("no first codepoint given");
         return error.MissingValue;
@@ -220,8 +225,10 @@ fn cliCodepointLast(
     opts: *Self,
     arena: std.mem.Allocator,
     cmd: Command,
-    value: []const u8,
+    entry: cli.Entry,
 ) !void {
+    const value = entry.value;
+
     if (value.len == 0) {
         cmd.log.err("no last codepoint given");
         return error.MissingValue;
@@ -285,10 +292,12 @@ fn cliLogFile(
     opts: *Self,
     _: std.mem.Allocator,
     cmd: Command,
-    value: []const u8,
+    entry: cli.Entry,
 ) !void {
+    const value = entry.value;
+
     if (value.len == 0) {
-        cmd.log.info("using stdout as log file");
+        cmd.log.info("using stderr as log file");
     }
 
     opts.log.file = value;
@@ -298,8 +307,10 @@ fn cliLogFormat(
     opts: *Self,
     arena: std.mem.Allocator,
     cmd: Command,
-    value: []const u8,
+    entry: cli.Entry,
 ) !void {
+    const value = entry.value;
+
     if (value.len == 0) {
         cmd.log.err("no log format given");
         return error.EmptyValue;
@@ -319,8 +330,10 @@ fn cliLogLevel(
     opts: *Self,
     arena: std.mem.Allocator,
     cmd: Command,
-    value: []const u8,
+    entry: cli.Entry,
 ) !void {
+    const value = entry.value;
+
     if (value.len == 0) {
         cmd.log.err("no log severity given");
         return error.EmptyValue;
