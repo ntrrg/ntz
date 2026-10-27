@@ -95,8 +95,8 @@ pub fn command(
 
     try cmd.addOption(Command.helpOption);
     try cmd.addOption(Command.versionOption);
-    try cmd.addOption(Command.genConfigOption);
     try cmd.addOption(Command.envFileOption);
+    try cmd.addOption(Command.genConfigOption);
 
     try cmd.addOption(.{
         .id = "log.file",
