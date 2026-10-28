@@ -38,8 +38,8 @@ test "ntz.logging.Logger" {
             },
         },
 
-        msg: []const u8,
         @"error": ?anyerror,
+        msg: []const u8,
     }).withSeverity(.info);
 
     buf.clear();
@@ -47,6 +47,16 @@ test "ntz.logging.Logger" {
 
     try testing.expectEqualStrings(
         "level=\"INFO\" msg=\"hello, world!\"\n",
+        buf.bytes(),
+    );
+
+    // Error field.
+
+    buf.clear();
+    log.withError(error.SomeError).err("something failed");
+
+    try testing.expectEqualStrings(
+        "level=\"ERROR\" error=\"SomeError\" msg=\"something failed\"\n",
         buf.bytes(),
     );
 
@@ -74,7 +84,7 @@ test "ntz.logging.Logger" {
         buf.bytes(),
     );
 
-    // Non-generic methods.
+    // Non-generic logging.
 
     buf.clear();
 
@@ -106,7 +116,6 @@ test "ntz.logging.Logger" {
         time: u64,
         level: []const u8,
         msg: []const u8,
-        @"error": ?anyerror,
 
         pub fn onLog(ctx: Self) Self {
             var _ctx = ctx;
@@ -122,4 +131,69 @@ test "ntz.logging.Logger" {
         "time=42 level=\"ERROR\" msg=\"hello, timed log!\"\n",
         buf.bytes(),
     );
+
+    // Tracing.
+
+    //@setEvalBranchQuota(2000);
+    //const io = testing.io;
+
+    //const tracing_log = logging.logger(w, e, struct {
+    //    level: []const u8,
+    //    trace_id: logging.Trace,
+    //    span_id: logging.Span,
+    //    parent_id: ?logging.Span,
+
+    //    http: ?struct {
+    //        request: ?struct {
+    //            method: []const u8,
+    //            url: []const u8,
+    //        },
+
+    //        response: ?struct {
+    //            status: u10,
+    //        },
+    //    },
+
+    //    @"error": ?anyerror,
+    //    msg: []const u8,
+    //}).newTrace(io);
+
+    //buf.clear();
+
+    //tracing_log.withScope("http")
+    //    .with("request.method", "GET")
+    //    .with("request.url", "http://localhost/")
+    //    .with("response.status", 200)
+    //    .info("hello, request!");
+
+    //tracing_log.withScope("http")
+    //    .newSpan(io)
+    //    .with("request.method", "GET")
+    //    .with("request.url", "http://localhost/")
+    //    .with("response.status", 200)
+    //    .info("hello, request!");
+
+    //const sub_tracing_log = tracing_log.newSpanChild(io);
+
+    //sub_tracing_log.withScope("http")
+    //    .with("request.method", "GET")
+    //    .with("request.url", "http://localhost/")
+    //    .with("response.status", 200)
+    //    .info("hello, request!");
+
+    //sub_tracing_log.withScope("http")
+    //    .newSpan(io)
+    //    .with("request.method", "GET")
+    //    .with("request.url", "http://localhost/")
+    //    .with("response.status", 200)
+    //    .info("hello, request!");
+
+    //sub_tracing_log.withScope("http")
+    //    .newTrace(io)
+    //    .with("request.method", "GET")
+    //    .with("request.url", "http://localhost/")
+    //    .with("response.status", 200)
+    //    .info("hello, request!");
+
+    //try testing.expectEqualStrings("", buf.bytes());
 }

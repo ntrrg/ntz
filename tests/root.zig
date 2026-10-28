@@ -3,6 +3,7 @@
 
 test "ntz" {
     _ = @import("encoding/root.zig");
+    _ = @import("id/root.zig");
     _ = @import("io/root.zig");
     _ = @import("logging/root.zig");
     _ = @import("types/root.zig");
